@@ -21,7 +21,9 @@ fn battle( players: &Vec<CharacterStruct>, num_turns: u8) {
 
     for i in 0..num_turns {
         let attack_result = melee_attack(players[0].to_hit, players[1].armour_class, players[0].damage);
-        println!("Attack: {}, Damage: {}",attack_result.attack_roll, attack_result.damage_roll);        
+        println!("{} Attacks with {} for {} damage.",players[0].name,attack_result.attack_roll, attack_result.damage_roll);        
+        let attack_result = melee_attack(players[1].to_hit, players[0].armour_class, players[0].damage);
+        println!("{} Attacks with {} for {} damage.",players[1].name,attack_result.attack_roll, attack_result.damage_roll);        
     }    
 }
 
@@ -67,7 +69,5 @@ fn main() {
     player_vec.push(player1);
     player_vec.push(player2);
     
-    for _n in 1..10 {
-        battle(&player_vec, 10);
-    }
+    battle(&player_vec, 10);
 }
