@@ -44,13 +44,21 @@ fn battle( players: &Vec<CharacterStruct>, num_turns: u8) {
         println!("{} Attacks with {} for {} damage.",players[0].name,attack_result.attack_roll, attack_result.damage_roll);        
         let damage_done = resolve_damage(attack_result.damage_roll, p2.hit_points);
         println!("  {:?} is {:?}  remaining hit point: {:?}", players[1].name, damage_done.target_state, damage_done.remaining_hit_points);
-        p2.hit_points=damage_done.remaining_hit_points;
+        match damage_done.target_state {
+            HealthState::DEAD => break,
+            HealthState::KO => break,
+            _=>p2.hit_points=damage_done.remaining_hit_points,
+        };
 
         let attack_result = melee_attack(p1.to_hit, p2.armour_class, p1.damage);
         println!("{} Attacks with {} for {} damage.",players[1].name,attack_result.attack_roll, attack_result.damage_roll);        
         let damage_done = resolve_damage(attack_result.damage_roll, p1.hit_points);
         println!("  {:?} is {:?}  remaining hit point: {:?}", players[0].name, damage_done.target_state, damage_done.remaining_hit_points);
-        p1.hit_points=damage_done.remaining_hit_points;
+        match damage_done.target_state {
+            HealthState::DEAD => break,
+            HealthState::KO => break,
+            _=>p1.hit_points=damage_done.remaining_hit_points,
+        };
     }    
 }
 
