@@ -15,34 +15,65 @@ struct CharacterCapabilities {
     damage: u8,
 }
 
-struct attack_result {
+struct AttackResult {
     attack_roll: u8,
     damage_roll: u8,
+}
+
+struct DamageResult{
+    remaining_hit_points: u8,
+    target_state: HealthState,
+}
+
+#[derive(Debug)]
+enum HealthState{
+    DEAD,
+    KO,
+    NOMINAL,
 }
 
 fn battle( players: &Vec<CharacterStruct>, num_turns: u8) {
     let mut rng = rand::thread_rng();
     let turn_order: [bool;10]= [rand::random(); 10];
 
-    let p1 = players[0].stats;
-    let p2 = players[1].stats;
+    let mut p1 = players[0].stats;
+    let mut p2 = players[1].stats;
 
     for i in 0..num_turns {
         let attack_result = melee_attack(p1.to_hit, p2.armour_class, p1.damage);
         println!("{} Attacks with {} for {} damage.",players[0].name,attack_result.attack_roll, attack_result.damage_roll);        
+        let damage_done = resolve_damage(attack_result.damage_roll, p2.hit_points);
+        println!("  {:?} is {:?}  remaining hit point: {:?}", players[1].name, damage_done.target_state, damage_done.remaining_hit_points);
+        p2.hit_points=damage_done.remaining_hit_points;
+
         let attack_result = melee_attack(p1.to_hit, p2.armour_class, p1.damage);
         println!("{} Attacks with {} for {} damage.",players[1].name,attack_result.attack_roll, attack_result.damage_roll);        
+        let damage_done = resolve_damage(attack_result.damage_roll, p1.hit_points);
+        println!("  {:?} is {:?}  remaining hit point: {:?}", players[0].name, damage_done.target_state, damage_done.remaining_hit_points);
+        p1.hit_points=damage_done.remaining_hit_points;
     }    
 }
 
 fn battle_turn(){
 }
 
-fn melee_attack(to_hit: u8, armour_class: u8, damage: u8) -> attack_result {
+fn resolve_damage(damage: u8, hit_points: u8) -> DamageResult {
+    let mut result = DamageResult{remaining_hit_points:hit_points,target_state:HealthState::NOMINAL};
+
+    match hit_points as i8 - damage as i8 {
+        d if d < 0  => result = DamageResult{remaining_hit_points: 0,target_state:HealthState::DEAD},
+        0 => result = DamageResult{remaining_hit_points: 0,target_state:HealthState::KO},
+        d if d > 0 => result = DamageResult{remaining_hit_points: d as u8,target_state:HealthState::NOMINAL},
+        _ => panic!("yup we got here...resolve_damage(damage: u8, hit_points: u8)"),
+    }
+    result
+}
+
+fn melee_attack(to_hit: u8, armour_class: u8, damage: u8) -> AttackResult {
     let mut rng = rand::thread_rng();
     let damage_done = 0;
 
-    let mut result = attack_result{
+    let mut result = AttackResult{
         attack_roll: 0,
         damage_roll: 0,
     };
