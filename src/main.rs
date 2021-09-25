@@ -42,11 +42,12 @@ struct BattleData {
     battle_data: Vec<TurnResult>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct TurnResult {
     action_results: Vec<ActionResult>,
 }
 
+#[derive(Clone)]
 struct ActionResult  {
     actor: String,
     target: String,
@@ -58,7 +59,7 @@ struct ActionResult  {
 }
 
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct BattleResult{
     turn_result: Vec<TurnResult>,
     battle_order: BattleOrder,
@@ -79,6 +80,7 @@ struct BattleOrder {
 //     }
 // }
 
+#[derive(Clone)]
 enum ActionResultType {
     CritFail,
     Fail,
@@ -87,6 +89,7 @@ enum ActionResultType {
     CritHit,
 }
 
+#[derive(Clone)]
 enum ActionType {
     Attack,
     Dodge,
@@ -97,12 +100,18 @@ enum ActionType {
 fn battle( players: &Vec<CharacterStruct>, num_iterations: u8) {
     let battle_order = make_battle_order(players);
     let mut battle_result:BattleResult = Default::default();
-    for battle in 0..num_iterations {
+    let mut battle_collection:Vec<BattleResult> = Vec::new();
+    //  TODO wrap battle_result in battle_results or something so we don't lose results
+
+    for _ in 0..num_iterations {
         battle_result = run_battle(battle_order.clone());
+        battle_collection.push(battle_result.clone());
     }
-    for turn in battle_result.turn_result {
-        for action in turn.action_results {
-            println!("attacker: {}",action.actor);
+    for battle in battle_collection {
+        for turn in battle.turn_result {
+            for action in turn.action_results {
+                println!("attacker: {}",action.actor);
+            }
         }
     }
 
@@ -156,7 +165,7 @@ fn run_battle_turn(battle_order: &mut Vec<BattleOrder>) -> TurnResult{
                     let action_result =  ActionResult {
                         actor: battle_order[i].character.name.clone(),
                         target: battle_order[i].character.name.clone(),
-                        action_number: i as u16,                           // tots not gonna work so fix?
+                        action_number: i as u16,                           
                         action_type: ActionType::Attack,
                         action_roll: attack_result.attack_roll,
                         action_result: attack_result.attack_result,
@@ -214,7 +223,6 @@ impl CharacterStruct {
 
 fn melee_attack(to_hit: u8, armour_class: u8, damage: u8) -> AttackResult {
     let mut rng = rand::thread_rng();
-    let damage_done = 0;
 
     let mut result = AttackResult{
         attack_roll: 0,
