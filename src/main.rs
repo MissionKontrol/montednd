@@ -96,7 +96,16 @@ enum ActionType {
 
 fn battle( players: &Vec<CharacterStruct>, num_iterations: u8) {
     let battle_order = make_battle_order(players);
-    let battle_result = run_battle(battle_order);
+    let mut battle_result:BattleResult = Default::default();
+    for battle in 0..num_iterations {
+        battle_result = run_battle(battle_order.clone());
+    }
+    for turn in battle_result.turn_result {
+        for action in turn.action_results {
+            println!("attacker: {}",action.actor);
+        }
+    }
+
 }
 
 fn make_battle_order(players: &Vec<CharacterStruct>) -> Vec<BattleOrder> {
@@ -117,68 +126,89 @@ fn make_battle_order(players: &Vec<CharacterStruct>) -> Vec<BattleOrder> {
     battle_order
 }
 
-fn run_battle(battle_order: Vec<BattleOrder>) -> BattleResult {
+fn run_battle(mut battle_order: Vec<BattleOrder>) -> BattleResult {
     let mut battle_result: BattleResult = Default::default();
-    let winning_result = false;
+    let mut winning_result = false;
 
     while !winning_result {
-        let turn_result = run_battle_turn(&battle_order);
+        let turn_result = run_battle_turn(&mut battle_order);
+        if turn_result.action_results.len() == 0 { winning_result=true}
         battle_result.turn_result.push(turn_result);
     }
     battle_result
 }
 
 
-fn run_battle_turn(battle_order: &Vec<BattleOrder>) -> TurnResult{
+fn run_battle_turn(battle_order: &mut Vec<BattleOrder>) -> TurnResult{
     let mut turn_result: TurnResult = Default::default();
-    let combatants = battle_order.clone();
 
     for i in 0..battle_order.len() {
         if battle_order[i].character_state == HealthState::NOMINAL {
-            let target = battle_order[i].character.select_target(&combatants);
-            let attack_result = melee_attack(battle_order[i].character.to_hit, battle_order[target].character.armour_class, battle_order[i].character.damage);
-            println!("{} Attacks with {} for {} damage.",battle_order[i].character.name, attack_result.attack_roll, attack_result.damage_roll);        
-            let damage_done = battle_order[target].character.resolve_damage(attack_result.damage_roll);
-            println!("  {:?} is {:?}  remaining hit point: {:?}", battle_order[target].character.name, damage_done.target_state, damage_done.remaining_hit_points);
+            let target = battle_order[i].character.select_target(&battle_order);
+            match target {
+                Some(x) => {
+                    let attack_result = melee_attack(battle_order[i].character.to_hit, battle_order[x].character.armour_class, battle_order[i].character.damage);
+                    println!("{} Attacks with {} for {} damage.",battle_order[i].character.name, attack_result.attack_roll, attack_result.damage_roll);        
+                    let damage_done = battle_order[x].resolve_damage(attack_result.damage_roll);
+                    println!("  {:?} is {:?}  remaining hit point: {:?}", battle_order[x].character.name, battle_order[x].character_state, battle_order[x].character.hit_points);
+        
+        
+                    let action_result =  ActionResult {
+                        actor: battle_order[i].character.name.clone(),
+                        target: battle_order[i].character.name.clone(),
+                        action_number: i as u16,                           // tots not gonna work so fix?
+                        action_type: ActionType::Attack,
+                        action_roll: attack_result.attack_roll,
+                        action_result: attack_result.attack_result,
+                        action_damage: attack_result.damage_roll as u16,
+                    };
+                    turn_result.action_results.push(action_result);
+                }
+                None => {
+                    return turn_result}
+            }
 
-
-            let action_result =  ActionResult {
-                actor: battle_order[i].character.name.clone(),
-                target: battle_order[i].character.name.clone(),
-                action_number: i as u16,                           // tots not gonna work so fix?
-                action_type: ActionType::Attack,
-                action_roll: attack_result.attack_roll,
-                action_result: attack_result.attack_result,
-                action_damage: attack_result.damage_roll as u16,
-            };
-            turn_result.action_results.push(action_result);
         }
     }
     turn_result
 }
 
-impl CharacterStruct {
-    fn select_target(&self, combatant_list: &Vec<BattleOrder>) -> usize {
-        for i in  0..combatant_list.len() {
-            if combatant_list[i].character.name != self.name && combatant_list[i].character_state == HealthState::NOMINAL {
-                println!("{} chooses {}", self.name, combatant_list[i].character.name);
-                return i;
-            }
-        }
-        panic!("failed to find target");
-    }
-
-    fn resolve_damage(&self, damage: u8) -> DamageResult {
+impl BattleOrder {
+    fn resolve_damage(&mut self, damage: u8) -> DamageResult {
         let mut result: DamageResult = Default::default();
-        let remaining_hit_points = self.hit_points - damage;
+        let remaining_hit_points = self.character.hit_points as i8 - damage as i8;
     
-        match remaining_hit_points as i8 - damage as i8 {
-            d if d < 0  => result = DamageResult{remaining_hit_points: 0,target_state:HealthState::DEAD},
-            0 => result = DamageResult{remaining_hit_points: 0,target_state:HealthState::KO},
-            d if d > 0 => result = DamageResult{remaining_hit_points: d as u8,target_state:HealthState::NOMINAL},
+        match remaining_hit_points  {
+            d if d < 0  => { 
+                result =  DamageResult{remaining_hit_points: 0,target_state:HealthState::DEAD};
+                self.character.hit_points = 0;
+                self.character_state = HealthState::DEAD;
+            },
+            0 => {
+                result = DamageResult{remaining_hit_points: 0,target_state:HealthState::KO};
+                self.character.hit_points = 0;
+                self.character_state = HealthState::KO;
+
+            }
+            d if d > 0 => {
+                result = DamageResult{remaining_hit_points: d as u8,target_state:HealthState::NOMINAL};
+                self.character.hit_points = remaining_hit_points as u8;
+            }
             _ => panic!("yup we got here...resolve_damage(damage: u8, hit_points: u8)"),
         }
         result
+    }
+}
+
+impl CharacterStruct {
+    fn select_target(&self, combatant_list: &Vec<BattleOrder>) -> Option<usize> {
+        for i in  0..combatant_list.len() {
+            if combatant_list[i].character.name != self.name && combatant_list[i].character_state == HealthState::NOMINAL {
+                println!("{} chooses {}", self.name, combatant_list[i].character.name);
+                return Some(i);
+            }
+        }
+        None
     }
 }
 
@@ -219,9 +249,20 @@ fn main() {
         damage: 6,  
     };
 
+    let player3 = CharacterStruct {
+        name: String::from("Player 3"),
+        hit_points: 10,
+        armour_class: 1,
+        to_hit: 12,
+        actions_per_round: 1,
+        damage: 6,  
+    };
+
     let mut player_vec = Vec::new(); 
     player_vec.push(player1);
-    player_vec.push(player2);
+    player_vec.push(player2);    
+    player_vec.push(player3);
+
     
     battle(&player_vec, 10);
 }
