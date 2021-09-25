@@ -1,5 +1,4 @@
 use rand::Rng;
-use std::collections::HashMap;
 
 #[derive(Default, Debug, Clone)]
 struct CharacterStruct {
@@ -17,7 +16,7 @@ struct AttackResult {
     attack_result: ActionResultType,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct DamageResult{
     remaining_hit_points: u8,
     target_state: HealthState,
@@ -37,11 +36,6 @@ impl Default for HealthState {
 }
 
 
-#[derive(Default)]
-struct BattleData {
-    battle_data: Vec<TurnResult>,
-}
-
 #[derive(Default, Clone)]
 struct TurnResult {
     action_results: Vec<ActionResult>,
@@ -55,7 +49,8 @@ struct ActionResult  {
     action_type: ActionType,
     action_roll: u8,
     action_result: ActionResultType,
-    action_damage: u16
+    action_damage: u16,
+    damage_done: DamageResult,
 }
 
 
@@ -72,39 +67,29 @@ struct BattleOrder {
     character: CharacterStruct,
 }
 
-// impl Iterator for BattleOrder {
-//     type Item = BattleOrder;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         Some(*self)
-//     }
-// }
-
 #[derive(Clone)]
 enum ActionResultType {
-    CritFail,
-    Fail,
+    _CritFail,
+    _Fail,
     Miss,
     Hit,
-    CritHit,
+    _CritHit,
 }
 
 #[derive(Clone)]
 enum ActionType {
     Attack,
-    Dodge,
-    Cast,
-    Initative,
+    _Dodge,
+    _Cast,
+    _Initative,
 }
 
 fn battle( players: &Vec<CharacterStruct>, num_iterations: u8) {
     let battle_order = make_battle_order(players);
-    let mut battle_result:BattleResult = Default::default();
     let mut battle_collection:Vec<BattleResult> = Vec::new();
-    //  TODO wrap battle_result in battle_results or something so we don't lose results
 
     for _ in 0..num_iterations {
-        battle_result = run_battle(battle_order.clone());
+        let battle_result = run_battle(battle_order.clone());
         battle_collection.push(battle_result.clone());
     }
     for battle in battle_collection {
@@ -157,11 +142,8 @@ fn run_battle_turn(battle_order: &mut Vec<BattleOrder>) -> TurnResult{
             match target {
                 Some(x) => {
                     let attack_result = melee_attack(battle_order[i].character.to_hit, battle_order[x].character.armour_class, battle_order[i].character.damage);
-                    println!("{} Attacks with {} for {} damage.",battle_order[i].character.name, attack_result.attack_roll, attack_result.damage_roll);        
                     let damage_done = battle_order[x].resolve_damage(attack_result.damage_roll);
-                    println!("  {:?} is {:?}  remaining hit point: {:?}", battle_order[x].character.name, battle_order[x].character_state, battle_order[x].character.hit_points);
-        
-        
+                
                     let action_result =  ActionResult {
                         actor: battle_order[i].character.name.clone(),
                         target: battle_order[i].character.name.clone(),
@@ -170,6 +152,7 @@ fn run_battle_turn(battle_order: &mut Vec<BattleOrder>) -> TurnResult{
                         action_roll: attack_result.attack_roll,
                         action_result: attack_result.attack_result,
                         action_damage: attack_result.damage_roll as u16,
+                        damage_done: damage_done,
                     };
                     turn_result.action_results.push(action_result);
                 }
