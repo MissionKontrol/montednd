@@ -1,5 +1,76 @@
-use rand::Rng;
 use std::thread;
+use rand::Rng;
+
+fn main() {
+    let player1 = CharacterStruct {
+        name: String::from("Base Hero"),
+        hit_points: 10,
+        armour_class: 12,
+        to_hit: 20,
+        actions_per_round: 1,
+        damage: 6,  
+        team: Team::Heros,
+    };
+
+    let player2 = CharacterStruct {
+        name: String::from("Base Baddie"),
+        hit_points: 6,
+        armour_class: 10,
+        to_hit: 20,
+        actions_per_round: 1,
+        damage: 4,  
+        team: Team::Villains,
+    };
+
+    // let player3 = CharacterStruct {
+    //     name: String::from("Villan 2"),
+    //     hit_points: 8,
+    //     armour_class: 2,
+    //     to_hit: 20,
+    //     actions_per_round: 1,
+    //     damage: 4,  
+    //     team: Team::Villains,
+    // };
+
+    let mut player_vec = Vec::new(); 
+    player_vec.push(player1);
+    player_vec.push(player2);    
+    // player_vec.push(player3);
+
+    let player_vec1 = player_vec.clone();
+    let player_vec2 = player_vec.clone();
+    let player_vec3 = player_vec.clone();
+    let player_vec4 = player_vec.clone();
+
+    let thread_iterations = 1_000_000;
+
+    let thread_one = thread::spawn(move||
+        {
+            battle(&player_vec1, thread_iterations)
+        });
+        
+    let thread_two = thread::spawn(move||
+        {
+            battle(&player_vec2, thread_iterations)
+        });
+
+    let thread_three = thread::spawn(move||
+        {
+            battle(&player_vec3, thread_iterations)
+        });    
+
+    let thread_four = thread::spawn(move||
+        {
+            battle(&player_vec4, thread_iterations)
+        });   
+
+    let _res = thread_one.join();
+    let _res = thread_two.join();
+    let _res = thread_three.join();
+    let _res = thread_four.join();
+
+}
+
 
 #[derive(Default, Debug, Clone)]
 struct CharacterStruct {
@@ -115,15 +186,15 @@ fn battle( players: &Vec<CharacterStruct>, num_iterations: u32) {
     }
     for battle in battle_collection {
         println!("Battle: {}  {} turns won by {:?} {}",battle.battle_id, battle.turns_run, battle.winner.name, battle.winner.hit_points);
-        for turn in battle.turn_result {
-            for action in turn.action_results {
-                println!("  {} {} {} {:?} {} {:?} {} {:?}",
-                    turn.turn_number,
-                    action.action_number,    
-                    action.actor,
-                    action.action_type, action.target, action.action_result, action.action_damage, action.damage_done.target_state);
-            }
-        }
+        // for turn in battle.turn_result {
+        //     for action in turn.action_results {
+        //         println!("  {} {} {} {:?} {} {:?} {} {:?}",
+        //             turn.turn_number,
+        //             action.action_number,    
+        //             action.actor,
+        //             action.action_type, action.target, action.action_result, action.action_damage, action.damage_done.target_state);
+        //     }
+        // }
     }
 
 }
@@ -134,7 +205,7 @@ fn make_battle_order(players: &Vec<CharacterStruct>) -> Vec<BattleOrder> {
     
     for player in players {
         let player_order = player.clone();
-        let initative_roll = rng.gen_range(1..20);
+        let initative_roll = rng.gen_range(1..21);
         println!("{} {}", player.name, initative_roll);
         let order = BattleOrder {
             initative_roll: initative_roll,
@@ -257,80 +328,10 @@ fn melee_attack(to_hit: u8, armour_class: u8, damage: u8) -> AttackResult {
         attack_result: ActionResultType::Miss,
     };
     
-    result.attack_roll  = rng.gen_range(1..to_hit);
+    result.attack_roll  = rng.gen_range(0..to_hit) + 1;
     if  result.attack_roll > armour_class {
-        result.damage_roll = rng.gen_range(1..damage);
+        result.damage_roll = rng.gen_range(0..damage) + 1;
         result.attack_result = ActionResultType::Hit;
     }
     result
-}
-
-fn main() {
-    let player1 = CharacterStruct {
-        name: String::from("Base Hero"),
-        hit_points: 10,
-        armour_class: 12,
-        to_hit: 20,
-        actions_per_round: 1,
-        damage: 6,  
-        team: Team::Heros,
-    };
-
-    let player2 = CharacterStruct {
-        name: String::from("Base Baddie"),
-        hit_points: 6,
-        armour_class: 10,
-        to_hit: 20,
-        actions_per_round: 1,
-        damage: 4,  
-        team: Team::Villains,
-    };
-
-    // let player3 = CharacterStruct {
-    //     name: String::from("Villan 2"),
-    //     hit_points: 8,
-    //     armour_class: 2,
-    //     to_hit: 20,
-    //     actions_per_round: 1,
-    //     damage: 4,  
-    //     team: Team::Villains,
-    // };
-
-    let mut player_vec = Vec::new(); 
-    player_vec.push(player1);
-    player_vec.push(player2);    
-    // player_vec.push(player3);
-
-    let player_vec1 = player_vec.clone();
-    let player_vec2 = player_vec.clone();
-    let player_vec3 = player_vec.clone();
-    let player_vec4 = player_vec.clone();
-
-    let thread_iterations = 1_000_000;
-
-    let thread_one = thread::spawn(move||
-        {
-            battle(&player_vec1, thread_iterations)
-        });
-        
-    let thread_two = thread::spawn(move||
-        {
-            battle(&player_vec2, thread_iterations)
-        });
-
-    let thread_three = thread::spawn(move||
-        {
-            battle(&player_vec3, thread_iterations)
-        });    
-
-    let thread_four = thread::spawn(move||
-        {
-            battle(&player_vec4, thread_iterations)
-        });   
-
-    let _res = thread_one.join();
-    let _res = thread_two.join();
-    let _res = thread_three.join();
-    let _res = thread_four.join();
-
 }
