@@ -1,10 +1,11 @@
 use std::thread;
 use std::fmt::Write;
 use rand::Rng;
+use std::collections::HashMap;
 
 fn main() {
     let player1 = CharacterStruct {
-        name: String::from("Base Hero"),
+        name: String::from("Hero"),
         hit_points: 10,
         armour_class: 12,
         to_hit: 20,
@@ -14,7 +15,7 @@ fn main() {
     };
 
     let player2 = CharacterStruct {
-        name: String::from("Base Baddie"),
+        name: String::from("Baddie"),
         hit_points: 6,
         armour_class: 10,
         to_hit: 20,
@@ -43,7 +44,7 @@ fn main() {
     let player_vec3 = player_vec.clone();
     let player_vec4 = player_vec.clone();
 
-    let thread_iterations = 250_000;
+    let thread_iterations = 1_000_000;
 
     let thread_one = thread::spawn(move||
         {
@@ -153,14 +154,18 @@ impl BattleResult {
     fn summarize_battle(&self, prefix: &str ) {
         let mut output: String;
 
-        output = format!("{}-{} {} {}", prefix, 
+        output = format!("{}-{} {} {:?}", prefix, 
             self.battle_id.to_string(), 
             self.turns_run.to_string(), 
-            self.winner.name.to_string());
+            self.winner.team);
 
         let initiative_winner = self.battle_order_list.iter().max_by_key(|p| p.initative_roll);
         match initiative_winner {
-            Some(winner) => write!(output, " {} ", winner.character.name.to_string()).unwrap(),
+            Some(player) => {
+                if player.team == self.winner.team {
+                    write!(output, "*").unwrap()
+                }
+            },
             None => write!(output, "initative Tie I guess").unwrap(),
         }
 
@@ -243,8 +248,12 @@ fn battle( players: &Vec<CharacterStruct>, num_iterations: u32, battle_prefix: &
         battle_result.battle_order_list = battle_order_list.clone();
         battle_collection_list.push(battle_result.clone());
     }
+
+    let mut turn_summary = HashMap::<u8,u32>::new();
+
     for battle in battle_collection_list {
-        battle.summarize_battle(battle_prefix);
+        // battle.summarize_battle(battle_prefix);
+        turn_summary.insert(battle.turns_run, 1 + if turn_summary.contains_key(&battle.turns_run) { turn_summary[&battle.turns_run] } else {1});
         // println!("Battle: {}  {} turns won by {:?} {}",battle.battle_id, battle.turns_run, battle.winner.name, battle.winner.hit_points);
         // for turn in battle.turn_result {
         //     for action in turn.action_results {
@@ -256,6 +265,9 @@ fn battle( players: &Vec<CharacterStruct>, num_iterations: u32, battle_prefix: &
         //     }
         // }
     }
+    for (key, value) in turn_summary.iter(){
+        println!("{} {}", key, value);
+    }
 
 }
 
@@ -264,8 +276,7 @@ fn make_battle_order_list(players: &Vec<CharacterStruct>) -> Vec<BattleOrder> {
     let mut battle_order_list = Vec::new();
     
     for player in players {
-        let player_order = player.clone();
-        let initative_roll = rng.gen_range(1..21);
+        let initative_roll = rng.gen_range(1..=20);
         println!("{} {}", player.name, initative_roll);
         let order = BattleOrder {
             initative_roll: initative_roll,
@@ -349,9 +360,9 @@ fn melee_attack(to_hit: u8, armour_class: u8, damage: u8) -> AttackResult {
         attack_result: ActionResultType::Miss,
     };
     
-    result.attack_roll  = rng.gen_range(0..to_hit) + 1;
+    result.attack_roll  = rng.gen_range(0..=to_hit);
     if  result.attack_roll > armour_class {
-        result.damage_roll = rng.gen_range(0..damage) + 1;
+        result.damage_roll = rng.gen_range(0..=damage);
         result.attack_result = ActionResultType::Hit;
     }
     result
