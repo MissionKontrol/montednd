@@ -4,40 +4,7 @@ use rand::Rng;
 use std::collections::HashMap;
 
 fn main() {
-    let player1 = CharacterStruct {
-        name: String::from("Hero"),
-        hit_points: 10,
-        armour_class: 12,
-        to_hit: 20,
-        actions_per_round: 1,
-        damage: 6,  
-        team: Team::Heros,
-    };
-
-    let player2 = CharacterStruct {
-        name: String::from("Baddie"),
-        hit_points: 6,
-        armour_class: 10,
-        to_hit: 20,
-        actions_per_round: 1,
-        damage: 4,  
-        team: Team::Villains,
-    };
-
-    // let player3 = CharacterStruct {
-    //     name: String::from("Villan 2"),
-    //     hit_points: 8,
-    //     armour_class: 2,
-    //     to_hit: 20,
-    //     actions_per_round: 1,
-    //     damage: 4,  
-    //     team: Team::Villains,
-    // };
-
-    let mut player_vec = Vec::new(); 
-    player_vec.push(player1);
-    player_vec.push(player2);    
-    // player_vec.push(player3);
+    let player_vec = get_players();
 
     let threads_desired: u8 = 4;
     let thread_iterations = 1;
@@ -78,6 +45,44 @@ fn main() {
         println!("{} {}", key, value);
     }
 
+}
+
+fn get_players() -> Vec<CharacterStruct> {
+    let player1 = CharacterStruct {
+        name: String::from("Hero"),
+        hit_points: 10,
+        armour_class: 12,
+        to_hit: 20,
+        actions_per_round: 1,
+        damage: 6,  
+        team: Team::Heros,
+    };
+
+    let player2 = CharacterStruct {
+        name: String::from("Baddie"),
+        hit_points: 6,
+        armour_class: 10,
+        to_hit: 20,
+        actions_per_round: 1,
+        damage: 4,  
+        team: Team::Villains,
+    };
+
+    // let player3 = CharacterStruct {
+    //     name: String::from("Villan 2"),
+    //     hit_points: 8,
+    //     armour_class: 2,
+    //     to_hit: 20,
+    //     actions_per_round: 1,
+    //     damage: 4,  
+    //     team: Team::Villains,
+    // };
+
+    let mut player_vec = Vec::new(); 
+    player_vec.push(player1);
+    player_vec.push(player2);    
+    // player_vec.push(player3);
+    player_vec
 }
 
 
