@@ -251,8 +251,7 @@ fn battle( players: &Vec<CharacterStruct>, num_iterations: u32, battle_prefix: u
 
     for battle_num in 0..num_iterations {
         let mut battle_result = run_battle(battle_order_list.clone());
-        let foo = format!("{}{:0>6}", battle_prefix, battle_num);
-        // battle_result.battle_id = writeln!("{}{:0>6}", battle_prefix.to_string(), battle_num);
+        battle_result.battle_id = format!("{}{:0>6}", battle_prefix, battle_num);
         battle_result.battle_order_list = battle_order_list.clone();
         battle_collection_list.push(battle_result.clone());
     }
@@ -266,7 +265,6 @@ fn make_battle_order_list(players: &Vec<CharacterStruct>) -> Vec<BattleOrder> {
     
     for player in players {
         let initative_roll = rng.gen_range(1..=20);
-        println!("{} {}", player.name, initative_roll);
         let order = BattleOrder {
             initative_roll: initative_roll,
             character: player.clone(),
