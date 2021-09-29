@@ -39,37 +39,44 @@ fn main() {
     player_vec.push(player2);    
     // player_vec.push(player3);
 
-    let player_vec1 = player_vec.clone();
-    let player_vec2 = player_vec.clone();
-    let player_vec3 = player_vec.clone();
-    let player_vec4 = player_vec.clone();
+    let threads_desired: u8 = 4;
+    let thread_iterations = 1;
 
-    let thread_iterations = 1_000_000;
+    let mut battle_collection_list:std::vec::Vec<BattleResult> = Vec::new();
+    let mut thread_list: Vec<thread::JoinHandle<_>> = Vec::new();
 
-    let thread_one = thread::spawn(move||
-        {
-            battle(&player_vec1, thread_iterations, "1")
-        });
-        
-    let thread_two = thread::spawn(move||
-        {
-            battle(&player_vec2, thread_iterations, "2")
-        });
+    for i in 0..threads_desired as usize{
+        let local_player_vec = player_vec.clone();
+        thread_list.push(thread::spawn(move||
+            {
+                battle(&local_player_vec.clone(), thread_iterations, i as u8)
+            }));   
+    }
+ 
+    for thread_counter in thread_list {
+        battle_collection_list.append(&mut thread_counter.join().unwrap());
+    }
 
-    let thread_three = thread::spawn(move||
-        {
-            battle(&player_vec3, thread_iterations, "3")
-        });    
 
-    let thread_four = thread::spawn(move||
-        {
-            battle(&player_vec4, thread_iterations, "4")
-        });   
+    let mut turn_summary = HashMap::new();
 
-    let _res = thread_one.join();
-    let _res = thread_two.join();
-    let _res = thread_three.join();
-    let _res = thread_four.join();
+    for battle in &battle_collection_list {
+        battle.summarize_battle();
+        turn_summary.insert(battle.turns_run, 1 + if turn_summary.contains_key(&battle.turns_run) { turn_summary[&battle.turns_run] } else {1});
+        // println!("Battle: {}  {} turns won by {:?} {}",battle.battle_id, battle.turns_run, battle.winner.name, battle.winner.hit_points);
+        // for turn in battle.turn_result {
+        //     for action in turn.action_results {
+        //         println!("  {} {} {} {:?} {} {:?} {} {:?}",
+        //             turn.turn_number,
+        //             action.action_number,    
+        //             action.actor,
+        //             action.action_type, action.target, action.action_result, action.action_damage, action.damage_done.target_state);
+        //     }
+        // }
+    }
+    for (key, value) in turn_summary.iter(){
+        println!("{} {}", key, value);
+    }
 
 }
 
@@ -108,7 +115,7 @@ struct DamageResult{
     target_state: HealthState,
 }
 
-#[derive(Debug, Clone, PartialOrd, Eq, Ord, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialOrd, Eq, Ord, PartialEq)]
 enum HealthState{
     DEAD,
     KO,
@@ -143,7 +150,7 @@ struct ActionResult  {
 
 #[derive(Default, Debug, Clone)]
 struct BattleResult{
-    battle_id: u32,
+    battle_id: String,
     turns_run: u8,
     winner: CharacterStruct,
     turn_result: Vec<TurnResult>,
@@ -151,11 +158,11 @@ struct BattleResult{
 }
 
 impl BattleResult {
-    fn summarize_battle(&self, prefix: &str ) {
+    fn summarize_battle(&self ) {
         let mut output: String;
 
-        output = format!("{}-{} {} {:?}", prefix, 
-            self.battle_id.to_string(), 
+        output = format!("{:0>7},{},{:?}",  
+            self.battle_id, 
             self.turns_run.to_string(), 
             self.winner.team);
 
@@ -209,7 +216,7 @@ impl BattleOrder {
 
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Debug)]
 enum Team {
     Heros,
     Villains,
@@ -221,7 +228,7 @@ impl Default for Team {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 enum ActionResultType {
     _CritFail,
     _Fail,
@@ -230,7 +237,7 @@ enum ActionResultType {
     _CritHit,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 enum ActionType {
     Attack,
     _Dodge,
@@ -238,37 +245,19 @@ enum ActionType {
     _Initative,
 }
 
-fn battle( players: &Vec<CharacterStruct>, num_iterations: u32, battle_prefix: &str) {
+fn battle( players: &Vec<CharacterStruct>, num_iterations: u32, battle_prefix: u8) -> Vec<BattleResult>{
     let battle_order_list = make_battle_order_list(players);
     let mut battle_collection_list:Vec<BattleResult> = Vec::new();
 
     for battle_num in 0..num_iterations {
         let mut battle_result = run_battle(battle_order_list.clone());
-        battle_result.battle_id = battle_num;
+        let foo = format!("{}{:0>6}", battle_prefix, battle_num);
+        // battle_result.battle_id = writeln!("{}{:0>6}", battle_prefix.to_string(), battle_num);
         battle_result.battle_order_list = battle_order_list.clone();
         battle_collection_list.push(battle_result.clone());
     }
 
-    let mut turn_summary = HashMap::<u8,u32>::new();
-
-    for battle in battle_collection_list {
-        // battle.summarize_battle(battle_prefix);
-        turn_summary.insert(battle.turns_run, 1 + if turn_summary.contains_key(&battle.turns_run) { turn_summary[&battle.turns_run] } else {1});
-        // println!("Battle: {}  {} turns won by {:?} {}",battle.battle_id, battle.turns_run, battle.winner.name, battle.winner.hit_points);
-        // for turn in battle.turn_result {
-        //     for action in turn.action_results {
-        //         println!("  {} {} {} {:?} {} {:?} {} {:?}",
-        //             turn.turn_number,
-        //             action.action_number,    
-        //             action.actor,
-        //             action.action_type, action.target, action.action_result, action.action_damage, action.damage_done.target_state);
-        //     }
-        // }
-    }
-    for (key, value) in turn_summary.iter(){
-        println!("{} {}", key, value);
-    }
-
+    battle_collection_list
 }
 
 fn make_battle_order_list(players: &Vec<CharacterStruct>) -> Vec<BattleOrder> {
