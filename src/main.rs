@@ -6,8 +6,9 @@ use std::collections::HashMap;
 fn main() {
     let player_vec = get_players();
 
+    let desired_iterations = 1_000_000;
     let threads_desired: u8 = 4;
-    let thread_iterations = 1;
+    let thread_iterations = desired_iterations/threads_desired as u32;
 
     let mut battle_collection_list:std::vec::Vec<BattleResult> = Vec::new();
     let mut thread_list: Vec<thread::JoinHandle<_>> = Vec::new();
@@ -26,10 +27,14 @@ fn main() {
 
 
     let mut turn_summary = HashMap::new();
+    let mut player_summary: HashMap<(String, u8), u32> = HashMap::new();
 
     for battle in &battle_collection_list {
-        battle.summarize_battle();
+        // battle.summarize_battle();
         turn_summary.insert(battle.turns_run, 1 + if turn_summary.contains_key(&battle.turns_run) { turn_summary[&battle.turns_run] } else {1});
+
+        // ToDo suggestions welcome...maybe add the winner?
+        // player_summary.insert((battle.clone().get_initative_winner(), battle.turns_run), 1 + if player_summary.contains_key(&battle.turns_run) { turn_summary[&battle.turns_run] } else {1});
         // println!("Battle: {}  {} turns won by {:?} {}",battle.battle_id, battle.turns_run, battle.winner.name, battle.winner.hit_points);
         // for turn in battle.turn_result {
         //     for action in turn.action_results {
@@ -42,7 +47,7 @@ fn main() {
         // }
     }
     for (key, value) in turn_summary.iter(){
-        println!("{} {}", key, value);
+        println!("{},{}", key, value);
     }
 
 }
@@ -171,17 +176,12 @@ impl BattleResult {
             self.turns_run.to_string(), 
             self.winner.team);
 
-        let initiative_winner = self.battle_order_list.iter().max_by_key(|p| p.initative_roll);
-        match initiative_winner {
-            Some(player) => {
-                if player.team == self.winner.team {
-                    write!(output, "*").unwrap()
-                }
-            },
-            None => write!(output, "initative Tie I guess").unwrap(),
-        }
-
         println!("{}", output);
+    }
+
+    fn get_initative_winner(self) -> String {
+        let initiative_winner = self.battle_order_list.iter().max_by_key(|p| p.initative_roll).unwrap();
+        initiative_winner.clone().character.name
     }
 }
 
