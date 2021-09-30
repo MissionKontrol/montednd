@@ -6,7 +6,7 @@ use std::collections::HashMap;
 fn main() {
     let player_vec = get_players();
 
-    let desired_iterations = 1_000_000;
+    let desired_iterations = 4_000_000;
     let threads_desired: u8 = 4;
     let thread_iterations = desired_iterations/threads_desired as u32;
 
@@ -34,7 +34,9 @@ fn main() {
         turn_summary.insert(battle.turns_run, 1 + if turn_summary.contains_key(&battle.turns_run) { turn_summary[&battle.turns_run] } else {1});
 
         // ToDo suggestions welcome...maybe add the winner?
-        // player_summary.insert((battle.clone().get_initative_winner(), battle.turns_run), 1 + if player_summary.contains_key(&battle.turns_run) { turn_summary[&battle.turns_run] } else {1});
+        player_summary.insert((battle.initiative_winner.clone(), battle.turns_run), 
+            1 + if player_summary.contains_key(&(battle.initiative_winner.clone(), battle.turns_run)) { turn_summary[&battle.turns_run] } else {1});
+
         // println!("Battle: {}  {} turns won by {:?} {}",battle.battle_id, battle.turns_run, battle.winner.name, battle.winner.hit_points);
         // for turn in battle.turn_result {
         //     for action in turn.action_results {
@@ -48,6 +50,10 @@ fn main() {
     }
     for (key, value) in turn_summary.iter(){
         println!("{},{}", key, value);
+    }
+
+    for (key, value) in player_summary.iter(){
+        println!("{:?},{}", key, value);
     }
 
 }
@@ -163,6 +169,7 @@ struct BattleResult{
     battle_id: String,
     turns_run: u8,
     winner: CharacterStruct,
+    initiative_winner: String,
     turn_result: Vec<TurnResult>,
     battle_order_list: Vec<BattleOrder>,
 }
@@ -297,7 +304,8 @@ fn run_battle(mut battle_order_list: Vec<BattleOrder>) -> BattleResult {
     }
     let winner = get_winner(battle_order_list).unwrap();
     battle_result.turns_run = turn_count-1;
-    battle_result.winner = winner.character;
+    battle_result.winner = winner.character.clone();
+    battle_result.initiative_winner = winner.character.name;
     battle_result
 }
 
