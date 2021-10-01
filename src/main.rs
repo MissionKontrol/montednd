@@ -6,7 +6,7 @@ use std::collections::HashMap;
 fn main() {
     let player_vec = get_players();
 
-    let desired_iterations = 4_000_000;
+    let desired_iterations = 2_500;
     let threads_desired: u8 = 4;
     let thread_iterations = desired_iterations/threads_desired as u32;
 
@@ -31,6 +31,9 @@ fn main() {
 
     for battle in &battle_collection_list {
         // battle.summarize_battle();
+        let battle_summary = battle.summarize();
+        println!("{}", battle_summary);
+
         turn_summary.insert(battle.turns_run, 1 + if turn_summary.contains_key(&battle.turns_run) { turn_summary[&battle.turns_run] } else {1});
 
         // ToDo suggestions welcome...maybe add the winner?
@@ -144,7 +147,6 @@ impl Default for HealthState {
     }
 }
 
-
 #[derive(Default, Debug, Clone)]
 struct TurnResult {
     turn_number: u8,
@@ -163,6 +165,30 @@ struct ActionResult  {
     damage_done: DamageResult,
 }
 
+struct BattleResultCollection {
+    arena_id: u8,
+    battle_count: u32,
+    battle_result_list: Vec<BattleResult>,
+
+}
+
+impl Summary for BattleResultCollection {
+    fn summarize(&self ) -> String {
+        let output = format!("{:0>7},{}",  
+            self.arena_id, 
+            self.battle_count.to_string());
+        output
+    }
+}
+
+struct summary {
+    source: String,
+    output: String,
+}
+
+trait Summary {
+    fn summarize(&self) -> String;
+}
 
 #[derive(Default, Debug, Clone)]
 struct BattleResult{
@@ -175,20 +201,20 @@ struct BattleResult{
 }
 
 impl BattleResult {
-    fn summarize_battle(&self ) {
-        let mut output: String;
+    fn get_initative_winner(&self) -> String {
+        let initiative_winner = self.battle_order_list.iter().max_by_key(|p| p.initative_roll).unwrap();
+        initiative_winner.character.name.clone()
+    }
+}
 
-        output = format!("{:0>7},{},{:?}",  
+impl Summary for BattleResult {
+    fn summarize(&self ) -> String {
+        let output = format!("{:0>7},{},{:?},{}",  
             self.battle_id, 
             self.turns_run.to_string(), 
-            self.winner.team);
-
-        println!("{}", output);
-    }
-
-    fn get_initative_winner(self) -> String {
-        let initiative_winner = self.battle_order_list.iter().max_by_key(|p| p.initative_roll).unwrap();
-        initiative_winner.clone().character.name
+            self.winner.team,
+            self.initiative_winner);
+        output
     }
 }
 
