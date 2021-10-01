@@ -26,7 +26,7 @@ fn main() {
     }
 
 
-    let mut turn_summary = HashMap::new();
+    // let mut turn_summary = HashMap::new();
     let mut player_summary: HashMap<(String, u8), u32> = HashMap::new();
 
     for battle in &battle_collection_list {
@@ -34,11 +34,11 @@ fn main() {
         let battle_summary = battle.summarize();
         println!("{}", battle_summary);
 
-        turn_summary.insert(battle.turns_run, 1 + if turn_summary.contains_key(&battle.turns_run) { turn_summary[&battle.turns_run] } else {1});
+        // turn_summary.insert(battle.turns_run, 1 + if turn_summary.contains_key(&battle.turns_run) { turn_summary[&battle.turns_run] } else {1});
 
         // ToDo suggestions welcome...maybe add the winner?
-        player_summary.insert((battle.initiative_winner.clone(), battle.turns_run), 
-            1 + if player_summary.contains_key(&(battle.initiative_winner.clone(), battle.turns_run)) { turn_summary[&battle.turns_run] } else {1});
+        // player_summary.insert((battle.initiative_winner.clone(), battle.turns_run), 
+            // 1 + if player_summary.contains_key(&(battle.initiative_winner.clone(), battle.turns_run)) { turn_summary[&battle.turns_run] } else {1});
 
         // println!("Battle: {}  {} turns won by {:?} {}",battle.battle_id, battle.turns_run, battle.winner.name, battle.winner.hit_points);
         // for turn in battle.turn_result {
@@ -51,13 +51,13 @@ fn main() {
         //     }
         // }
     }
-    for (key, value) in turn_summary.iter(){
-        println!("{},{}", key, value);
-    }
+    // for (key, value) in turn_summary.iter(){
+    //     println!("{},{}", key, value);
+    // }
 
-    for (key, value) in player_summary.iter(){
-        println!("{:?},{}", key, value);
-    }
+    // for (key, value) in player_summary.iter(){
+    //     println!("{:?},{}", key, value);
+    // }
 
 }
 
@@ -73,7 +73,7 @@ fn get_players() -> Vec<CharacterStruct> {
     };
 
     let player2 = CharacterStruct {
-        name: String::from("Baddie"),
+        name: String::from("Villan"),
         hit_points: 6,
         armour_class: 10,
         to_hit: 20,
@@ -202,7 +202,7 @@ struct BattleResult{
 
 impl BattleResult {
     fn get_initative_winner(&self) -> String {
-        let initiative_winner = self.battle_order_list.iter().max_by_key(|p| p.initative_roll).unwrap();
+        let initiative_winner = self.battle_order_list.iter().max_by_key(|p| p.initative_roll).expect("duff list");
         initiative_winner.character.name.clone()
     }
 }
@@ -320,6 +320,9 @@ fn run_battle(mut battle_order_list: Vec<BattleOrder>) -> BattleResult {
     let mut winning_result = false;
     let mut turn_count: u8 = 0;
 
+    battle_result.battle_order_list = battle_order_list.clone();
+    battle_result.initiative_winner = battle_result.get_initative_winner();
+
     while !winning_result {
         let turn_result = run_battle_turn(&mut battle_order_list, turn_count);
         turn_count +=1;
@@ -331,7 +334,6 @@ fn run_battle(mut battle_order_list: Vec<BattleOrder>) -> BattleResult {
     let winner = get_winner(battle_order_list).unwrap();
     battle_result.turns_run = turn_count-1;
     battle_result.winner = winner.character.clone();
-    battle_result.initiative_winner = winner.character.name;
     battle_result
 }
 
