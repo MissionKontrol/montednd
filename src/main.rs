@@ -6,11 +6,10 @@ use rand::Rng;
 fn main() {
     let player_vec = get_players();
 
-    let desired_iterations = 50_000_000;
+    let desired_iterations = 6_000;
     let threads_desired: u8 = 6;
     let thread_iterations = desired_iterations/threads_desired as u32;
 
-    // let mut battle_collection_list:std::vec::Vec<BattleResult> = Vec::new();
     let mut battle_collection_list:Vec<BattleResultCollection> = Vec::with_capacity(6);
     let mut thread_list: Vec<thread::JoinHandle<_>> = Vec::with_capacity(6);
 
@@ -26,40 +25,10 @@ fn main() {
         battle_collection_list.push(thread_counter.join().unwrap());
     }
 
-
-    // let mut turn_summary = HashMap::new();
-    // let mut player_summary: HashMap<(String, u8), u32> = HashMap::new();
-
     for battle in &battle_collection_list {
-        // battle.summarize_battle();
         let battle_summary = battle.summarize();
-        // println!("{}", battle_summary);
-
-        // turn_summary.insert(battle.turns_run, 1 + if turn_summary.contains_key(&battle.turns_run) { turn_summary[&battle.turns_run] } else {1});
-
-        // ToDo suggestions welcome...maybe add the winner?
-        // player_summary.insert((battle.initiative_winner.clone(), battle.turns_run), 
-            // 1 + if player_summary.contains_key(&(battle.initiative_winner.clone(), battle.turns_run)) { turn_summary[&battle.turns_run] } else {1});
-
-        // println!("Battle: {}  {} turns won by {:?} {}",battle.battle_id, battle.turns_run, battle.winner.name, battle.winner.hit_points);
-        // for turn in battle.turn_result {
-        //     for action in turn.action_results {
-        //         println!("  {} {} {} {:?} {} {:?} {} {:?}",
-        //             turn.turn_number,
-        //             action.action_number,    
-        //             action.actor,
-        //             action.action_type, action.target, action.action_result, action.action_damage, action.damage_done.target_state);
-        //     }
-        // }
+        println!("{}", battle_summary);
     }
-    // for (key, value) in turn_summary.iter(){
-    //     println!("{},{}", key, value);
-    // }
-
-    // for (key, value) in player_summary.iter(){
-    //     println!("{:?},{}", key, value);
-    // }
-
 }
 
 fn get_players() -> Vec<CharacterStruct> {
@@ -183,7 +152,6 @@ impl Summary for BattleResultCollection {
         output
     }
 }
-
 
 #[derive(Default, Debug, Clone)]
 struct BattleResult{
@@ -325,6 +293,7 @@ fn run_battle(mut battle_order_list: Vec<BattleOrder>) -> BattleResult {
         match turn_result {
             Some(x) => {
                 turn_count +=1;
+                battle_result.turn_result.push(x);
             },
             None => winning_result=true,
         }
