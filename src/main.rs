@@ -222,30 +222,30 @@ struct BattleOrder {
 
 impl BattleOrder {
     fn resolve_damage(&mut self, damage: u8) -> DamageResult {
-        let mut result: DamageResult = Default::default();
         let remaining_hit_points = self.character.hit_points as i8 - damage as i8;
     
         match remaining_hit_points  {
             d if d < 0  => { 
-                result =  DamageResult{remaining_hit_points: 0,target_state:HealthState::DEAD};
+                let damage_result =  DamageResult{remaining_hit_points: 0,target_state:HealthState::DEAD};
                 self.character.hit_points = 0;
                 self.character_state = HealthState::DEAD;
+                return damage_result;
             },
             0 => {
-                result = DamageResult{remaining_hit_points: 0,target_state:HealthState::KO};
+                let damage_result = DamageResult{remaining_hit_points: 0,target_state:HealthState::KO};
                 self.character.hit_points = 0;
                 self.character_state = HealthState::KO;
+                return damage_result;
 
             }
             d if d > 0 => {
-                result = DamageResult{remaining_hit_points: d as u8,target_state:HealthState::NOMINAL};
+                let damage_result = DamageResult{remaining_hit_points: d as u8,target_state:HealthState::NOMINAL};
                 self.character.hit_points = remaining_hit_points as u8;
+                return damage_result;
             }
             _ => panic!("yup we got here...resolve_damage(damage: u8, hit_points: u8)"),
         }
-        result
     }
-
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Debug)]
