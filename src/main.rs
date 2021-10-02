@@ -1,17 +1,18 @@
 use std::thread;
-use std::fmt::Write;
+// use std::fmt::Write;
 use rand::Rng;
-use std::collections::HashMap;
+// use std::collections::HashMap;
 
 fn main() {
     let player_vec = get_players();
 
-    let desired_iterations = 2_500;
-    let threads_desired: u8 = 4;
+    let desired_iterations = 50_000_000;
+    let threads_desired: u8 = 6;
     let thread_iterations = desired_iterations/threads_desired as u32;
 
-    let mut battle_collection_list:std::vec::Vec<BattleResult> = Vec::new();
-    let mut thread_list: Vec<thread::JoinHandle<_>> = Vec::new();
+    // let mut battle_collection_list:std::vec::Vec<BattleResult> = Vec::new();
+    let mut battle_collection_list:Vec<BattleResultCollection> = Vec::with_capacity(6);
+    let mut thread_list: Vec<thread::JoinHandle<_>> = Vec::with_capacity(6);
 
     for i in 0..threads_desired as usize{
         let local_player_vec = player_vec.clone();
@@ -22,7 +23,7 @@ fn main() {
     }
  
     for thread_counter in thread_list {
-        battle_collection_list.append(&mut thread_counter.join().unwrap());
+        battle_collection_list.push(thread_counter.join().unwrap());
     }
 
 
@@ -32,7 +33,7 @@ fn main() {
     for battle in &battle_collection_list {
         // battle.summarize_battle();
         let battle_summary = battle.summarize();
-        println!("{}", battle_summary);
+        // println!("{}", battle_summary);
 
         // turn_summary.insert(battle.turns_run, 1 + if turn_summary.contains_key(&battle.turns_run) { turn_summary[&battle.turns_run] } else {1});
 
@@ -92,7 +93,7 @@ fn get_players() -> Vec<CharacterStruct> {
     //     team: Team::Villains,
     // };
 
-    let mut player_vec = vec!(player1,player2);
+    let player_vec = vec!(player1,player2);
     player_vec
 }
 
@@ -109,7 +110,7 @@ struct CharacterStruct {
 }
 
 impl CharacterStruct {
-    fn select_target(&self, combatant_list: &Vec<BattleOrder>) -> Option<usize> {
+    fn select_target(&self, combatant_list: &[BattleOrder]) -> Option<usize> {
         for i in  0..combatant_list.len() {
             if combatant_list[i].character.team != self.team && combatant_list[i].character_state == HealthState::NOMINAL {
                 return Some(i);
@@ -162,11 +163,12 @@ struct ActionResult  {
     damage_done: DamageResult,
 }
 
+#[derive(Default)]
 struct BattleResultCollection {
     arena_id: u8,
     battle_count: u32,
     battle_result_list: Vec<BattleResult>,
-
+    battle_order_list: Vec<BattleOrder>,
 }
 
 trait Summary {
@@ -190,15 +192,14 @@ struct BattleResult{
     winner: CharacterStruct,
     initiative_winner: String,
     turn_result: Vec<TurnResult>,
-    battle_order_list: Vec<BattleOrder>,
 }
 
-impl BattleResult {
-    fn get_initative_winner(&self) -> String {
-        let initiative_winner = self.battle_order_list.iter().max_by_key(|p| p.initative_roll).expect("duff list");
-        initiative_winner.character.name.clone()
-    }
-}
+// impl BattleResult {
+//     fn get_initative_winner(&self) -> String {
+//         let initiative_winner = self.battle_order_list.iter().max_by_key(|p| p.initative_roll).expect("duff list");
+//         initiative_winner.character.name.clone()
+//     }
+// }
 
 impl Summary for BattleResult {
     fn summarize(&self ) -> String {
@@ -276,15 +277,21 @@ enum ActionType {
     _Initative,
 }
 
-fn battle( players: &Vec<CharacterStruct>, num_iterations: u32, battle_prefix: u8) -> Vec<BattleResult>{
+fn battle( players: &Vec<CharacterStruct>, battle_count: u32, arena_id: u8) -> BattleResultCollection {
     let battle_order_list = make_battle_order_list(players);
-    let mut battle_collection_list:Vec<BattleResult> = Vec::new();
+    let mut battle_collection_list = BattleResultCollection {
+        battle_order_list: battle_order_list.clone(),
+        battle_count,
+        arena_id,
+        ..Default::default()
+    };
 
-    for battle_num in 0..num_iterations {
+
+    for battle_num in 0..battle_count {
         let mut battle_result = run_battle(battle_order_list.clone());
-        battle_result.battle_id = format!("{}{:0>6}", battle_prefix, battle_num);
-        battle_result.battle_order_list = battle_order_list.clone();
-        battle_collection_list.push(battle_result.clone());
+        battle_result.battle_id = format!("{}{:0>6}", battle_count, battle_num);
+        battle_collection_list.battle_order_list = battle_order_list.clone();
+        battle_collection_list.battle_result_list.push(battle_result.clone());
     }
 
     battle_collection_list
@@ -300,7 +307,7 @@ fn make_battle_order_list(players: &Vec<CharacterStruct>) -> Vec<BattleOrder> {
             initative_roll,
             character: player.clone(),
             character_state: HealthState::NOMINAL,
-            team: player.team.clone(),
+            team: player.team,
         };
         battle_order_list.push(order);
     }
@@ -313,20 +320,18 @@ fn run_battle(mut battle_order_list: Vec<BattleOrder>) -> BattleResult {
     let mut winning_result = false;
     let mut turn_count: u8 = 0;
 
-    battle_result.battle_order_list = battle_order_list.clone();
-    battle_result.initiative_winner = battle_result.get_initative_winner();
-
     while !winning_result {
         let turn_result = run_battle_turn(&mut battle_order_list, turn_count);
-        turn_count +=1;
         match turn_result {
-            Some(x) => battle_result.turn_result.push(x),
+            Some(x) => {
+                turn_count +=1;
+            },
             None => winning_result=true,
         }
     }
     let winner = get_winner(battle_order_list).unwrap();
-    battle_result.turns_run = turn_count-1;
-    battle_result.winner = winner.character.clone();
+    battle_result.turns_run = turn_count;
+    battle_result.winner = winner.character;
     battle_result
 }
 
@@ -340,7 +345,7 @@ fn get_winner(battle_order_list: Vec<BattleOrder>) -> Option<BattleOrder> {
 }
 
 fn run_battle_turn(battle_order_list: &mut Vec<BattleOrder>, turn_number: u8) -> Option<TurnResult>{
-    let mut turn_result: TurnResult = Default::default();
+    let mut turn_result = TurnResult { turn_number: turn_number, ..Default::default() };
     turn_result.turn_number = turn_number;
 
     for i in 0..battle_order_list.len() {
