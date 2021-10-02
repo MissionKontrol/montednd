@@ -17,7 +17,7 @@ fn main() {
         let local_player_vec = player_vec.clone();
         thread_list.push(thread::spawn(move||
             {
-                battle(&local_player_vec.clone(), thread_iterations, i as u8)
+                battle(&local_player_vec, thread_iterations, i as u8)
             }));   
     }
  
@@ -27,7 +27,7 @@ fn main() {
 
 
     // let mut turn_summary = HashMap::new();
-    let mut player_summary: HashMap<(String, u8), u32> = HashMap::new();
+    // let mut player_summary: HashMap<(String, u8), u32> = HashMap::new();
 
     for battle in &battle_collection_list {
         // battle.summarize_battle();
@@ -92,10 +92,7 @@ fn get_players() -> Vec<CharacterStruct> {
     //     team: Team::Villains,
     // };
 
-    let mut player_vec = Vec::new(); 
-    player_vec.push(player1);
-    player_vec.push(player2);    
-    // player_vec.push(player3);
+    let mut player_vec = vec!(player1,player2);
     player_vec
 }
 
@@ -172,6 +169,10 @@ struct BattleResultCollection {
 
 }
 
+trait Summary {
+    fn summarize(&self) -> String;
+}
+
 impl Summary for BattleResultCollection {
     fn summarize(&self ) -> String {
         let output = format!("{:0>7},{}",  
@@ -181,14 +182,6 @@ impl Summary for BattleResultCollection {
     }
 }
 
-struct summary {
-    source: String,
-    output: String,
-}
-
-trait Summary {
-    fn summarize(&self) -> String;
-}
 
 #[derive(Default, Debug, Clone)]
 struct BattleResult{
@@ -304,7 +297,7 @@ fn make_battle_order_list(players: &Vec<CharacterStruct>) -> Vec<BattleOrder> {
     for player in players {
         let initative_roll = rng.gen_range(1..=20);
         let order = BattleOrder {
-            initative_roll: initative_roll,
+            initative_roll,
             character: player.clone(),
             character_state: HealthState::NOMINAL,
             team: player.team.clone(),
@@ -366,7 +359,7 @@ fn run_battle_turn(battle_order_list: &mut Vec<BattleOrder>, turn_number: u8) ->
                         action_roll: attack_result.attack_roll,
                         action_result: attack_result.attack_result,
                         action_damage: attack_result.damage_roll as u16,
-                        damage_done: damage_done,
+                        damage_done,
                     };
                     turn_result.action_results.push(action_result);
                 }
