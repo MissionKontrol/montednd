@@ -28,6 +28,9 @@ fn main() {
     for battle in &battle_collection_list {
         let battle_summary = battle.summarize();
         println!("{}", battle_summary);
+        for foo in &battle.battle_result_list {
+            println!("{}",foo.summarize());
+        }
     }
 }
 
@@ -254,10 +257,12 @@ fn battle( players: &Vec<CharacterStruct>, battle_count: u32, arena_id: u8) -> B
         ..Default::default()
     };
 
+    let initiative_winner = &battle_order_list.iter().max_by_key(|p| p.initative_roll).expect("duff list");
 
     for battle_num in 0..battle_count {
         let mut battle_result = run_battle(battle_order_list.clone());
-        battle_result.battle_id = format!("{}{:0>6}", battle_count, battle_num);
+        battle_result.battle_id = format!("{}{:0>6}", arena_id, battle_num);
+        battle_result.initiative_winner = initiative_winner.character.name.clone();
         battle_collection_list.battle_order_list = battle_order_list.clone();
         battle_collection_list.battle_result_list.push(battle_result.clone());
     }
