@@ -69,7 +69,6 @@ fn get_players() -> Vec<CharacterStruct> {
     player_vec
 }
 
-
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 struct CharacterStruct {
     name: String,
@@ -366,4 +365,24 @@ fn melee_attack(to_hit: u8, armour_class: u8, damage: u8) -> AttackResult {
         result.attack_result = ActionResultType::Hit;
     }
     result
+}
+
+#[test]
+fn test_make_battle_order_list() {
+    let players = get_players();
+    let test_list = make_battle_order_list(&players);
+    assert_ne!(test_list.len(),0,"no list");
+}
+
+#[test]
+fn test_order_of_make_battler_order_list() {
+    let players = get_players();
+    let test_list = make_battle_order_list(&players);
+    assert_eq!(test_list[0].initative_roll > test_list[1].initative_roll,true,"list not ordered");
+}
+
+#[test]
+fn get_players_test() {
+    let list = get_players();
+    assert_ne!(list.len(), 0, "Character get fail")
 }
