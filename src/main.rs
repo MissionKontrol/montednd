@@ -6,7 +6,7 @@ use std::collections::HashMap;
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    let desired_iterations = 6_000;
+    let desired_iterations = 600_000;
     let threads_desired: u8 = 6;
     let thread_iterations = desired_iterations/threads_desired as u32;
 
@@ -142,7 +142,7 @@ struct BattleResultCollection {
 struct CollectionSummary {
     arena_id: u8,
     battle_count: u32,
-    total_turns_run: u16,
+    total_turns_run: u32,
     average_turns_run: u16,
     _max_turns_run: u8,    
 }
@@ -166,13 +166,13 @@ enum BattleCollectionSummary {
 
 impl Summary<BattleCollectionSummary> for BattleResultCollection {
     fn summarize(&self ) -> Option<BattleCollectionSummary> {
-        let total_turns_run: u16 = self.battle_result_list.iter()
-            .fold(0u16, |acc, battle_result| acc + battle_result.turns_run as u16);
+        let total_turns_run: u32 = self.battle_result_list.iter()
+            .fold(0u32, |acc, battle_result| acc + battle_result.turns_run as u32);
         let battle_collection_summary = CollectionSummary {
             arena_id: self.arena_id, 
             battle_count: self.battle_count,
             total_turns_run,
-            average_turns_run: total_turns_run/self.battle_count as u16,
+            average_turns_run: (total_turns_run /self.battle_count) as u16,
             _max_turns_run: self.battle_result_list.iter().fold(0u8, |max, battle_result| if max > battle_result.turn_result.len() as u8 { max }
                 else { battle_result.turn_result.len() as u8 }),    
         };
