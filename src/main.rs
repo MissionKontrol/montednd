@@ -26,10 +26,13 @@ fn main() -> Result<(),String> {
     }
 
     for battle in &battle_collection_list {
-        let summary = battle.summarize().expect("something");
-
+        // let summary = battle.summarize().expect("something");
+        if let BattleCollectionSummary::Summary(collection) = 
+            battle.summarize().expect("something") {
+                println!("{}", collection.battle_count );
+                println!("{}", collection);
+        }
     }
-    
     Ok(())
 }
 
@@ -139,9 +142,16 @@ struct BattleResultCollection {
 struct CollectionSummary {
     arena_id: u8,
     battle_count: u32,
-    total_turns_run: u32,
-    average_turns_run: u8,
-    max_turns_run: u8,    
+    total_turns_run: u16,
+    average_turns_run: u16,
+    _max_turns_run: u8,    
+}
+
+use std::fmt;
+impl fmt::Display for CollectionSummary {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{},{},{},{},{}", self.arena_id, self.battle_count, self.total_turns_run, self.average_turns_run, self._max_turns_run)
+    }
 }
 
 struct CollectionAccumulation {
@@ -156,12 +166,15 @@ enum BattleCollectionSummary {
 
 impl Summary<BattleCollectionSummary> for BattleResultCollection {
     fn summarize(&self ) -> Option<BattleCollectionSummary> {
+        let total_turns_run: u16 = self.battle_result_list.iter()
+            .fold(0u16, |acc, battle_result| acc + battle_result.turns_run as u16);
         let battle_collection_summary = CollectionSummary {
             arena_id: self.arena_id, 
             battle_count: self.battle_count,
-            total_turns_run: 2,
-            average_turns_run: 2,
-            max_turns_run: 2,    
+            total_turns_run,
+            average_turns_run: total_turns_run/self.battle_count as u16,
+            _max_turns_run: self.battle_result_list.iter().fold(0u8, |max, battle_result| if max > battle_result.turn_result.len() as u8 { max }
+                else { battle_result.turn_result.len() as u8 }),    
         };
         Some(BattleCollectionSummary::Summary( battle_collection_summary))
     }
@@ -212,7 +225,7 @@ impl Summary<BattleSummary> for BattleResult {
     fn summarize(&self) -> Option<BattleSummary> {
         let battle_summary = BattleSummary {
             battle_id: self.battle_id.clone(), 
-            turns_run: self.turns_run, 
+            turns_run: self.turn_result.len() as u8, 
             winner: self.winner.name.clone(),
             initiative_winner: self.initiative_winner.clone(),
         };
