@@ -1,3 +1,4 @@
+use std::fmt;
 use std::thread;
 // use std::fmt::Write;
 use rand::Rng;
@@ -6,7 +7,7 @@ use std::collections::HashMap;
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    let desired_iterations = 600_000;
+    let desired_iterations = 1_200_000;
     let threads_desired: u8 = 6;
     let thread_iterations = desired_iterations/threads_desired as u32;
 
@@ -33,6 +34,15 @@ fn main() -> Result<(),String> {
                 println!("{}", collection);
         }
     }
+
+    for battle in &battle_collection_list {
+        if let BattleCollectionSummary::Accumulation(collection) = 
+            battle.accumulate_summary().expect("accumulator says not") {
+                println!("{}", collection.number_of_battles);
+                println!("{}", collection)
+            }
+    }
+
     Ok(())
 }
 
@@ -75,7 +85,8 @@ struct CharacterStruct {
 impl CharacterStruct {
     fn select_target(&self, combatant_list: &[BattleOrder]) -> Option<usize> {
         for i in  0..combatant_list.len() {
-            if combatant_list[i].character.team != self.team && combatant_list[i].character_state == HealthState::NOMINAL {
+            if combatant_list[i].character.team != self.team && combatant_list[i].character_state == HealthState::Nominal
+             {
                 return Some(i);
             }
         }
@@ -97,20 +108,22 @@ struct DamageResult{
 
 #[derive(Debug, Clone, Copy, PartialOrd, Eq, Ord, PartialEq)]
 enum HealthState{
-    DEAD,
-    KO,
-    NOMINAL,
+    Dead,
+    Ko,
+    Nominal
+    ,
 }
 
 impl Default for HealthState {
     fn default() -> Self {
-        HealthState::NOMINAL
+        HealthState::Nominal
+
     }
 }
 
 trait Summary <T> {
     fn summarize(&self) -> Option<T>;
-    fn accumulate_summary(self) -> Option<T>;
+    fn accumulate_summary(&self) -> Option<T>;
 }
 
 #[derive(Default, Debug, Clone)]
@@ -147,16 +160,26 @@ struct CollectionSummary {
     _max_turns_run: u8,    
 }
 
-use std::fmt;
+struct CollectionAccumulation {
+    number_of_battles: u32,
+    accumulation: HashMap<(u16,String),u16>,
+}
+
 impl fmt::Display for CollectionSummary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{},{},{},{},{}", self.arena_id, self.battle_count, self.total_turns_run, self.average_turns_run, self._max_turns_run)
     }
 }
 
-struct CollectionAccumulation {
-    number_of_battles: u32,
-    accumulation: HashMap<(u16,String),u16>,
+impl fmt::Display for CollectionAccumulation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut output = String::new();
+        for row in self.accumulation.clone() {
+            let write_row = format!("{:?} {}\n", row.0, row.1);
+            output.push_str(&write_row);
+        }
+        write!(f, "{}", output)
+    }    
 }
 
 enum BattleCollectionSummary {
@@ -179,11 +202,11 @@ impl Summary<BattleCollectionSummary> for BattleResultCollection {
         Some(BattleCollectionSummary::Summary( battle_collection_summary))
     }
 
-    fn accumulate_summary(self) -> Option<BattleCollectionSummary>{
+    fn accumulate_summary(&self) -> Option<BattleCollectionSummary>{
         let mut number_of_battles: u32 = 0;
         let mut accumulation:HashMap<(u16,String),u16> = HashMap::new();
 
-        for battle in self.battle_result_list {
+        for battle in &self.battle_result_list {
             number_of_battles += 1;
             let res = battle.summarize()?;
 
@@ -232,7 +255,7 @@ impl Summary<BattleSummary> for BattleResult {
         Some(battle_summary)
     }
 
-    fn accumulate_summary(self) -> Option<BattleSummary>{
+    fn accumulate_summary(&self) -> Option<BattleSummary>{
         todo!()
     }
 }
@@ -251,22 +274,23 @@ impl BattleOrder {
     
         match remaining_hit_points  {
             d if d < 0  => { 
-                let damage_result =  DamageResult{remaining_hit_points: 0,target_state:HealthState::DEAD};
+                let damage_result =  DamageResult{remaining_hit_points: 0,target_state:HealthState::Dead};
                 self.character.hit_points = 0;
-                self.character_state = HealthState::DEAD;
-                return damage_result;
+                self.character_state = HealthState::Dead;
+                damage_result
             },
             0 => {
-                let damage_result = DamageResult{remaining_hit_points: 0,target_state:HealthState::KO};
+                let damage_result = DamageResult{remaining_hit_points: 0,target_state:HealthState::Ko};
                 self.character.hit_points = 0;
-                self.character_state = HealthState::KO;
-                return damage_result;
+                self.character_state = HealthState::Ko;
+                damage_result
 
             }
             d if d > 0 => {
-                let damage_result = DamageResult{remaining_hit_points: d as u8,target_state:HealthState::NOMINAL};
+                let damage_result = DamageResult{remaining_hit_points: d as u8,target_state:HealthState::Nominal
+                };
                 self.character.hit_points = remaining_hit_points as u8;
-                return damage_result;
+                damage_result
             }
             _ => panic!("yup we got here...resolve_damage(damage: u8, hit_points: u8)"),
         }
@@ -302,7 +326,7 @@ enum ActionType {
     _Initative,
 }
 
-fn battle( players: &Vec<CharacterStruct>, battle_count: u32, arena_id: u8) -> BattleResultCollection {
+fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8) -> BattleResultCollection {
     let battle_order_list = make_battle_order_list(players);
     let mut battle_collection_list = BattleResultCollection {
         battle_order_list: battle_order_list.clone(),
@@ -324,7 +348,7 @@ fn battle( players: &Vec<CharacterStruct>, battle_count: u32, arena_id: u8) -> B
     battle_collection_list
 }
 
-fn make_battle_order_list(players: &Vec<CharacterStruct>) -> Vec<BattleOrder> {
+fn make_battle_order_list(players: &[CharacterStruct]) -> Vec<BattleOrder> {
     let mut rng = rand::thread_rng();
     let mut battle_order_list = Vec::new();
     
@@ -333,7 +357,8 @@ fn make_battle_order_list(players: &Vec<CharacterStruct>) -> Vec<BattleOrder> {
         let order = BattleOrder {
             initative_roll,
             character: player.clone(),
-            character_state: HealthState::NOMINAL,
+            character_state: HealthState::Nominal
+            ,
             team: player.team,
         };
         battle_order_list.push(order);
@@ -365,7 +390,8 @@ fn run_battle(mut battle_order_list: Vec<BattleOrder>) -> BattleResult {
 
 fn get_winner(battle_order_list: Vec<BattleOrder>) -> Option<BattleOrder> {
     for player in battle_order_list {
-        if player.character_state == HealthState::NOMINAL {
+        if player.character_state == HealthState::Nominal
+         {
             return Some(player);
         }
     }
@@ -373,11 +399,12 @@ fn get_winner(battle_order_list: Vec<BattleOrder>) -> Option<BattleOrder> {
 }
 
 fn run_battle_turn(battle_order_list: &mut Vec<BattleOrder>, turn_number: u8) -> Option<TurnResult>{
-    let mut turn_result = TurnResult { turn_number: turn_number, ..Default::default() };
+    let mut turn_result = TurnResult { turn_number, ..Default::default() };
     turn_result.turn_number = turn_number;
 
     for i in 0..battle_order_list.len() {
-        if battle_order_list[i].character_state == HealthState::NOMINAL {
+        if battle_order_list[i].character_state == HealthState::Nominal
+         {
             let target = battle_order_list[i].character.select_target(&battle_order_list);
             match target {
                 Some(target) => {
