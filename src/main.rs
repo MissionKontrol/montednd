@@ -87,7 +87,7 @@ impl CharacterStruct {
         for i in  0..combatant_list.len() {
             if combatant_list[i].character.team != self.team && combatant_list[i].character_state == HealthState::Nominal
              {
-                return Some(i);
+                return Some(i)
             }
         }
         None
@@ -121,11 +121,6 @@ impl Default for HealthState {
     }
 }
 
-trait Summary <T> {
-    fn summarize(&self) -> Option<T>;
-    fn accumulate_summary(&self) -> Option<T>;
-}
-
 #[derive(Default, Debug, Clone)]
 struct TurnResult {
     turn_number: u8,
@@ -142,6 +137,11 @@ struct ActionResult  {
     action_result: ActionResultType,
     action_damage: u16,
     damage_done: DamageResult,
+}
+
+trait Summary <T> {
+    fn summarize(&self) -> Option<T>;
+    fn accumulate_summary(&self) -> Option<T>;
 }
 
 #[derive(Default)]
@@ -210,10 +210,13 @@ impl Summary<BattleCollectionSummary> for BattleResultCollection {
             number_of_battles += 1;
             let res = battle.summarize()?;
 
-            let winner = if res.winner == res.initiative_winner { format!("{}*", res.winner)}
-                        else { res.winner };
-
-            *accumulation.entry((res.turns_run as u16,winner)).or_insert(0) += 1;
+            if let BattleResultSummary::Summary(battle_summary) = res {
+                let winner = if battle_summary.winner == battle_summary.initiative_winner { 
+                    format!("{}*", battle_summary.winner)
+                }
+                else { battle_summary.winner };
+                *accumulation.entry((battle_summary.turns_run as u16,winner)).or_insert(0) += 1;
+            }
         }
         let battle_collection_accumulation = CollectionAccumulation{
             number_of_battles,
@@ -239,23 +242,29 @@ struct BattleSummary {
     initiative_winner: String,
 }
 
-struct BattleAccumulator {
+struct BattleAccumulation {
     numer_of_battles: u32,
 
 }
 
-impl Summary<BattleSummary> for BattleResult {
-    fn summarize(&self) -> Option<BattleSummary> {
+enum BattleResultSummary {
+    Summary(BattleSummary),
+    Accumulation(BattleAccumulation),
+}
+
+
+impl Summary<BattleResultSummary> for BattleResult {
+    fn summarize(&self) -> Option<BattleResultSummary> {
         let battle_summary = BattleSummary {
             battle_id: self.battle_id.clone(), 
             turns_run: self.turn_result.len() as u8, 
             winner: self.winner.name.clone(),
             initiative_winner: self.initiative_winner.clone(),
         };
-        Some(battle_summary)
+        Some(BattleResultSummary::Summary(battle_summary))
     }
 
-    fn accumulate_summary(&self) -> Option<BattleSummary>{
+    fn accumulate_summary(&self) -> Option<BattleResultSummary>{
         todo!()
     }
 }
