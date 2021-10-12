@@ -7,8 +7,8 @@ use std::collections::HashMap;
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    let desired_iterations = 1_200;
-    let threads_desired: u8 = 6;
+    let desired_iterations = 100;
+    let threads_desired: u8 = 1;
     let thread_iterations = desired_iterations/threads_desired as u32;
 
     let mut battle_collection_list:Vec<BattleResultCollection> = Vec::with_capacity(6);
@@ -88,20 +88,21 @@ struct CharacterStruct {
 impl CharacterStruct {
     fn select_target(&self, combatant_list: &[BattleOrder]) -> Option<usize> {
         for i in  0..combatant_list.len() {
-            if combatant_list[i].character.team != self.team {     
-                if let HealthState::Alive(_) = combatant_list[i].character_state {
+            if combatant_list[i].character.team != self.team &&
+                combatant_list[i].character.is_concious() {
+                    println!("{:?}, {}", combatant_list[i].character.hs2,
+                        combatant_list[i].character.is_concious());
                     return Some(i)
-                }
             }
         }
         None
     }
 
-    fn is_concious(self) ->  bool {
+    fn is_concious(&self) ->  bool {
         match self.hs2 {
-            Dead => false,
-            Ko => false,
-            Alive => true,
+            HealthState::Dead => false,
+            HealthState::Ko => false,
+            HealthState::Alive(_) => true,
         }
     }
 
@@ -135,8 +136,8 @@ impl Default for HealthState {
 impl HealthState {
     fn update_health_state(self, modifier: i16) -> HealthState {
         match self {
-            Dead => HealthState::Dead,
-            Ko => if (0 - modifier) < -10 { HealthState::Dead} else { HealthState::Ko },
+            HealthState::Dead => HealthState::Dead,
+            HealthState::Ko => if (0 - modifier) < -10 { HealthState::Dead} else { HealthState::Ko },
             HealthState::Alive(x) => HealthState::Alive(x - modifier as u16),
         }
     }
@@ -305,26 +306,30 @@ impl Summary<BattleResultSummary> for BattleResult {
 #[derive(Default, Debug, Eq, Ord, PartialEq, PartialOrd, Clone)]
 struct BattleOrder {
     initative_roll: u8,
-    character_state: HealthState,
     character: CharacterStruct,
     team: Team,
 }
 
 impl BattleOrder {
     fn resolve_damage(&mut self, damage: u8) -> DamageResult {
-        let remaining_hit_points = self.character.hit_points as i8 - damage as i8;
+        let remaining_hit_points: i8;
+        self.character.take_damage(damage as u16);
+        match self.character.hs2 {
+            HealthState::Alive(hit_points) => remaining_hit_points = hit_points as i8 - damage as i8,
+            _ => remaining_hit_points = 0,
+        };
     
         match remaining_hit_points  {
             d if d < 0  => { 
                 let damage_result =  DamageResult{remaining_hit_points: 0,target_state:HealthState::Dead};
                 self.character.hit_points = 0;
-                self.character_state = HealthState::Dead;
+                self.character.hs2 = HealthState::Dead;
                 damage_result
             },
             0 => {
                 let damage_result = DamageResult{remaining_hit_points: 0,target_state:HealthState::Ko};
                 self.character.hit_points = 0;
-                self.character_state = HealthState::Ko;
+                self.character.hs2 = HealthState::Ko;
                 damage_result
 
             }
@@ -332,15 +337,17 @@ impl BattleOrder {
                 let damage_result = DamageResult{remaining_hit_points: d as u8,target_state:HealthState::Alive(d as u16)
                 };
                 self.character.hit_points = remaining_hit_points as u8;
+                self.character.hs2 = HealthState::Alive(remaining_hit_points as u16);
+
                 damage_result
             }
             _ => panic!("yup we got here...resolve_damage(damage: u8, hit_points: u8)"),
         }
     }
 
-    fn resolve_attack(attack_result: AttackResult, mut target: CharacterStruct, damage_string: u16 ) -> Option<bool> {
+    fn resolve_attack(attack_result: AttackResult, mut target: CharacterStruct, damage: u16 ) -> Option<bool> {
         if attack_result.attack_roll > target.armour_class {
-            target.take_damage(16);
+            target.take_damage(damage);
         }
         Some(true)
     }
@@ -405,7 +412,6 @@ fn make_battle_order_list(players: &[CharacterStruct]) -> Vec<BattleOrder> {
         let order = BattleOrder {
             initative_roll,
             character: player.clone(),
-            character_state: HealthState::Alive(player.hit_points as u16),
             team: player.team,
         };
         battle_order_list.push(order);
@@ -437,7 +443,7 @@ fn run_battle(mut battle_order_list: Vec<BattleOrder>) -> BattleResult {
 
 fn get_winner(battle_order_list: Vec<BattleOrder>) -> Option<BattleOrder> {
     for player in battle_order_list {
-        if let HealthState::Alive(_) = player.character_state {
+        if let HealthState::Alive(_) = player.character.hs2 {
             return Some(player);
         }
     }
@@ -449,7 +455,7 @@ fn run_battle_turn(battle_order_list: &mut Vec<BattleOrder>, turn_number: u8) ->
     turn_result.turn_number = turn_number;
 
     for i in 0..battle_order_list.len() {
-        if let HealthState::Alive(_) = battle_order_list[i].character_state 
+        if let HealthState::Alive(_) = battle_order_list[i].character.hs2 
          {
             let target = battle_order_list[i].character.select_target(&battle_order_list);
             match target {
