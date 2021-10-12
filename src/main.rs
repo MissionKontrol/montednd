@@ -92,6 +92,14 @@ impl CharacterStruct {
         }
         None
     }
+
+    fn make_attack(){}
+
+    fn decide_action(){}
+
+    fn defend_attack(){}
+
+    fn react_to(){}
 }
 
 struct AttackResult {
@@ -110,14 +118,12 @@ struct DamageResult{
 enum HealthState{
     Dead,
     Ko,
-    Nominal
-    ,
+    Nominal,
 }
 
 impl Default for HealthState {
     fn default() -> Self {
         HealthState::Nominal
-
     }
 }
 
@@ -304,6 +310,13 @@ impl BattleOrder {
             _ => panic!("yup we got here...resolve_damage(damage: u8, hit_points: u8)"),
         }
     }
+
+    fn resolve_attack(attack_result: AttackResult, target: CharacterStruct, damage_string: String ) -> Option<bool> {
+        if attack_result.attack_roll > target.armour_class {
+
+        }
+        Some(true)
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Debug)]
@@ -320,8 +333,7 @@ impl Default for Team {
 
 #[derive(Clone, Debug, Copy)]
 enum ActionResultType {
-    _CritFail,
-    _Fail,
+    _CritMiss,
     Miss,
     Hit,
     _CritHit,
@@ -332,7 +344,7 @@ enum ActionType {
     Attack,
     _Dodge,
     _Cast,
-    _Initative,
+    _Dash,
 }
 
 fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8) -> BattleResultCollection {
@@ -460,7 +472,7 @@ fn melee_attack(to_hit: u8, armour_class: u8, damage: u8) -> AttackResult {
 
 #[test]
 fn test_make_battle_order_list() {
-    let players = get_players();
+    let players = get_players(); 
     let test_list = make_battle_order_list(&players);
     assert_ne!(test_list.len(),0,"no list");
 }
