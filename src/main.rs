@@ -138,8 +138,16 @@ impl HealthState {
         match self {
             HealthState::Dead => HealthState::Dead,
             HealthState::Ko => if (0 - modifier) < -10 { HealthState::Dead} else { HealthState::Ko },
-            HealthState::Alive(x) => HealthState::Alive(x - modifier as u16),
+            HealthState::Alive(hit_points) => self.get_new_state_maybe(hit_points as i16 - modifier),
         }
+    }
+
+    fn get_new_state_maybe(&self, integer_state: i16) -> HealthState {
+        match integer_state {
+            x if x < 0 => return HealthState::Dead,
+            x if x == 0 => return HealthState::Ko,
+            _ => return HealthState::Alive(integer_state as u16),
+        };
     }
 }
 
