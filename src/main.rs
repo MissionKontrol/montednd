@@ -7,7 +7,7 @@ use std::collections::HashMap;
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    let desired_iterations = 1_200_000;
+    let desired_iterations = 1_200;
     let threads_desired: u8 = 6;
     let thread_iterations = desired_iterations/threads_desired as u32;
 
@@ -137,6 +137,13 @@ impl CharacterStruct {
         DamageResult {
             damage: rng.gen_range(1..=self.damage),
         }
+    }
+
+    fn attack_is_successful(&self, attack_result: &MeleeAttack ) -> bool {
+        if attack_result.attack_roll > self.armour_class {
+            return true
+        }
+            false
     }
 
     fn _decide_action(){}
@@ -380,11 +387,40 @@ struct BattleOrder {
 }
 
 impl BattleOrder {
-    fn resolve_attack(&self, attack_result: &MeleeAttack ) -> bool {
-        if attack_result.attack_roll > self.character.armour_class {
-            return true
-        }
-            false
+    fn _make_action_result() {
+
+    }
+}
+
+ 
+fn run_turn_action(turn_number: u8, target: &mut CharacterStruct, actor: &mut CharacterStruct) -> ActionResult {
+    let a_res = actor.make_attack();
+    if target.attack_is_successful(&a_res){
+        let d_res = actor.do_some_damage();
+        target.take_damage(d_res.damage as u16);
+
+        let action_result =  ActionResult {
+            actor: actor.name.clone(),
+            target: target.name.clone(),
+            action_number: 1,                         // TODO fix  
+            action_type: ActionType::Attack,
+            action_roll: a_res.attack_roll,
+            action_result: ActionResultType::Hit,
+            action_damage: d_res.damage as u16,
+        };
+        action_result
+    }
+    else {
+        let action_result =  ActionResult {
+            actor: actor.name.clone(),
+            target: target.name.clone(),
+            action_number: 1,                         // TODO fix  
+            action_type: ActionType::Attack,
+            action_roll: a_res.attack_roll,
+            action_result: ActionResultType::Miss,
+            action_damage: 0,
+        };
+        action_result
     }
 }
 
@@ -461,29 +497,40 @@ fn run_battle_turn(battle_order_list: &mut [BattleOrder], turn_number: u8) -> Op
     let mut turn_result = TurnResult { turn_number, ..Default::default() };
     turn_result.turn_number = turn_number;
 
-    for i in 0..battle_order_list.len() {
-        if let HealthState::Alive(_) = battle_order_list[i].character.hs2 
-         {
-            let target = battle_order_list[i].character.select_target(&battle_order_list);
+    for actor in 0..battle_order_list.len() {
+        if let HealthState::Alive(_) = battle_order_list[actor].character.hs2 {
+            let target = battle_order_list[actor].character.select_target(&battle_order_list);
             match target {
                 Some(target) => {
-                    let attack_result = battle_order_list[i].character.make_attack();
-                    if battle_order_list[target].resolve_attack(&attack_result) {
-                        let damage_result = battle_order_list[i].character.do_some_damage();
-                        battle_order_list[target].character.take_damage(damage_result.damage as u16);   
-                        
-                            let action_result =  ActionResult {
-                            actor: battle_order_list[i].character.name.clone(),
+                    let a_res = battle_order_list[actor].character.make_attack();
+                    if battle_order_list[target].character.attack_is_successful(&a_res){
+                        let d_res = battle_order_list[actor].character.do_some_damage();
+                        battle_order_list[target].character.take_damage(d_res.damage as u16);
+
+                        let action_result =  ActionResult {
+                            actor: battle_order_list[actor].character.name.clone(),
                             target: battle_order_list[target].character.name.clone(),
-                            action_number: i as u16,                           
+                            action_number: 1,                         // TODO fix  
                             action_type: ActionType::Attack,
-                            action_roll: attack_result.attack_roll,
+                            action_roll: a_res.attack_roll,
                             action_result: ActionResultType::Hit,
-                            action_damage: damage_result.damage as u16,
+                            action_damage: d_res.damage as u16,
                         };
                         turn_result.action_results.push(action_result);
                     }
-                }
+                    else {
+                        let action_result =  ActionResult {
+                            actor: battle_order_list[actor].character.name.clone(),
+                            target: battle_order_list[target].character.name.clone(),
+                            action_number: 1,                         // TODO fix  
+                            action_type: ActionType::Attack,
+                            action_roll: a_res.attack_roll,
+                            action_result: ActionResultType::Miss,
+                            action_damage: 0,
+                        };
+                        turn_result.action_results.push(action_result);
+                    }
+                    }
                 None => return Option::None
             }
         }
