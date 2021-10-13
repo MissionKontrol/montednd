@@ -52,6 +52,7 @@ fn get_players() -> Vec<CharacterStruct> {
         hit_points: 10,
         armour_class: 12,
         to_hit: 20,
+        weapon: "+1",
         actions_per_round: 1,
         damage: 6,  
         team: Team::Heros,
@@ -63,6 +64,7 @@ fn get_players() -> Vec<CharacterStruct> {
         hit_points: 6,
         armour_class: 10,
         to_hit: 20,
+        weapon: "+1",
         actions_per_round: 1,
         damage: 4,  
         team: Team::Villains,
@@ -74,6 +76,7 @@ fn get_players() -> Vec<CharacterStruct> {
         hit_points: 6,
         armour_class: 10,
         to_hit: 20,
+        weapon: "+1",
         actions_per_round: 1,
         damage: 4,  
         team: Team::Villains,
@@ -90,6 +93,7 @@ struct CharacterStruct {
     hit_points: u8,
     armour_class: u8,
     to_hit: u8,
+    weapon: &'static str,
     actions_per_round: u8,
     damage: u8,
     team: Team,
@@ -115,7 +119,25 @@ impl CharacterStruct {
         }
     }
 
-    fn _make_attack(){}
+    fn make_attack(&self) -> MeleeAttack {
+        let mut rng = rand::thread_rng();
+
+        let roll = rng.gen_range(1..=self.to_hit);
+        // TODO
+        // add weapon + ability
+        MeleeAttack { 
+            roll_string: self.weapon.clone(),
+            attack_roll: roll,
+        }
+    }
+
+    fn do_some_damage(&self) -> DamageResult {
+        let mut rng = rand::thread_rng();
+
+        DamageResult {
+            damage: rng.gen_range(1..=self.damage),
+        }
+    }
 
     fn _decide_action(){}
 
@@ -127,6 +149,34 @@ impl CharacterStruct {
     }
 
     fn _react_to(){}
+}
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Debug)]
+enum Team {
+    Heros,
+    Villains,
+}
+
+impl Default for Team {
+    fn default() -> Self {
+        Team::Heros
+    }
+}
+
+#[derive(Clone, Debug, Copy)]
+enum ActionResultType {
+    _CritMiss,
+    Miss,
+    Hit,
+    _CritHit,
+}
+
+#[derive(Clone, Debug, Copy)]
+enum ActionType {
+    Attack,
+    _Dodge,
+    _Cast,
+    _Dash,
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, Eq, Ord, PartialEq)]
@@ -170,8 +220,8 @@ struct AttackResult {
 
 #[derive(Default, Clone, Debug)]
 struct DamageResult{
-    remaining_hit_points: u8,
-    target_state: HealthState,
+    damage: u8,
+    // hit_type: ActionResultType,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -330,50 +380,12 @@ struct BattleOrder {
 }
 
 impl BattleOrder {
-    fn resolve_damage(&mut self, damage: u8) -> DamageResult {
-        self.character.take_damage(damage as u16);
-    
-        match self.character.hs2  {
-            HealthState::Alive(hp) => DamageResult{remaining_hit_points: hp as u8,target_state:HealthState::Alive(hp as u16)},
-            HealthState::Dead => DamageResult{remaining_hit_points: 0,target_state:HealthState::Dead},
-            HealthState::Ko => DamageResult{remaining_hit_points: 0,target_state:HealthState::Ko},
+    fn resolve_attack(&self, attack_result: &MeleeAttack ) -> bool {
+        if attack_result.attack_roll > self.character.armour_class {
+            return true
         }
+            false
     }
-
-    fn _resolve_attack(attack_result: AttackResult, mut target: CharacterStruct, damage: u16 ) -> Option<bool> {
-        if attack_result.attack_roll > target.armour_class {
-            target.take_damage(damage);
-        }
-        Some(true)
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Debug)]
-enum Team {
-    Heros,
-    Villains,
-}
-
-impl Default for Team {
-    fn default() -> Self {
-        Team::Heros
-    }
-}
-
-#[derive(Clone, Debug, Copy)]
-enum ActionResultType {
-    _CritMiss,
-    Miss,
-    Hit,
-    _CritHit,
-}
-
-#[derive(Clone, Debug, Copy)]
-enum ActionType {
-    Attack,
-    _Dodge,
-    _Cast,
-    _Dash,
 }
 
 fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8) -> BattleResultCollection {
@@ -455,46 +467,33 @@ fn run_battle_turn(battle_order_list: &mut [BattleOrder], turn_number: u8) -> Op
             let target = battle_order_list[i].character.select_target(&battle_order_list);
             match target {
                 Some(target) => {
-                    let attack_result = melee_attack(battle_order_list[i].character.to_hit, battle_order_list[target].character.armour_class, battle_order_list[i].character.damage);
-                    if attack_result.attack_roll > battle_order_list[target].character.armour_class {
-                        let damage_done = battle_order_list[target].resolve_damage(attack_result.damage_roll);
+                    let attack_result = battle_order_list[i].character.make_attack();
+                    if battle_order_list[target].resolve_attack(&attack_result) {
+                        let damage_result = battle_order_list[i].character.do_some_damage();
+                        battle_order_list[target].character.take_damage(damage_result.damage as u16);   
+                        
+                            let action_result =  ActionResult {
+                            actor: battle_order_list[i].character.name.clone(),
+                            target: battle_order_list[target].character.name.clone(),
+                            action_number: i as u16,                           
+                            action_type: ActionType::Attack,
+                            action_roll: attack_result.attack_roll,
+                            action_result: ActionResultType::Hit,
+                            action_damage: damage_result.damage as u16,
+                        };
+                        turn_result.action_results.push(action_result);
                     }
-                                    
-                    let action_result =  ActionResult {
-                        actor: battle_order_list[i].character.name.clone(),
-                        target: battle_order_list[target].character.name.clone(),
-                        action_number: i as u16,                           
-                        action_type: ActionType::Attack,
-                        action_roll: attack_result.attack_roll,
-                        action_result: attack_result.attack_result,
-                        action_damage: attack_result.damage_roll as u16,
-                    };
-                    turn_result.action_results.push(action_result);
                 }
-                None => {
-                    return Option::None}
+                None => return Option::None
             }
-
         }
     }
     Some(turn_result)
 }
 
-fn melee_attack(to_hit: u8, armour_class: u8, damage: u8) -> AttackResult {
-    let mut rng = rand::thread_rng();
-
-    let mut result = AttackResult{
-        attack_roll: 0,
-        damage_roll: 0,
-        attack_result: ActionResultType::Miss,
-    };
-    
-    result.attack_roll  = rng.gen_range(0..=to_hit);
-    if  result.attack_roll > armour_class {
-        result.damage_roll = rng.gen_range(0..=damage);
-        result.attack_result = ActionResultType::Hit;
-    }
-    result
+struct MeleeAttack {
+    roll_string: &'static str,
+    attack_roll: u8,
 }
 
 #[test]
