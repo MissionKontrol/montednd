@@ -7,8 +7,8 @@ use std::collections::HashMap;
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    let desired_iterations = 100;
-    let threads_desired: u8 = 1;
+    let desired_iterations = 1_200_000;
+    let threads_desired: u8 = 6;
     let thread_iterations = desired_iterations/threads_desired as u32;
 
     let mut battle_collection_list:Vec<BattleResultCollection> = Vec::with_capacity(6);
@@ -59,7 +59,7 @@ fn get_players() -> Vec<CharacterStruct> {
     };
 
     let player2 = CharacterStruct {
-        name: String::from("Villan"),
+        name: String::from("Villan-A"),
         hit_points: 6,
         armour_class: 10,
         to_hit: 20,
@@ -69,7 +69,18 @@ fn get_players() -> Vec<CharacterStruct> {
         hs2: HealthState::Alive(6),
     };
 
-    let player_vec = vec!(player1,player2);
+    let player3 = CharacterStruct {
+        name: String::from("Villan-B"),
+        hit_points: 6,
+        armour_class: 10,
+        to_hit: 20,
+        actions_per_round: 1,
+        damage: 4,  
+        team: Team::Villains,
+        hs2: HealthState::Alive(6),
+    };
+
+    let player_vec = vec!(player1,player2,player3);
     player_vec
 }
 
@@ -90,8 +101,6 @@ impl CharacterStruct {
         for i in  0..combatant_list.len() {
             if combatant_list[i].character.team != self.team &&
                 combatant_list[i].character.is_concious() {
-                    println!("{:?}, {}", combatant_list[i].character.hs2,
-                        combatant_list[i].character.is_concious());
                     return Some(i)
             }
         }
@@ -112,9 +121,9 @@ impl CharacterStruct {
 
     fn _defend_attack(){}
 
-    fn take_damage(&mut self, damage: u16) -> HealthState{
-        self.hs2.update_health_state(damage as i16);
-        self.hs2
+    fn take_damage(&mut self, damage: u16) -> &Self {
+        self.hs2 = self.hs2.update_health_state(damage as i16);
+        self
     }
 
     fn _react_to(){}
@@ -134,20 +143,22 @@ impl Default for HealthState {
 }
 
 impl HealthState {
-    fn update_health_state(self, modifier: i16) -> HealthState {
+    fn update_health_state(self, modifier: i16) -> Self {
+        const KO_THRESHOLD: i16 = -10;
+
         match self {
             HealthState::Dead => HealthState::Dead,
-            HealthState::Ko => if (0 - modifier) < -10 { HealthState::Dead} else { HealthState::Ko },
+            HealthState::Ko => if (0 - modifier) < KO_THRESHOLD { HealthState::Dead } else { HealthState::Ko },
             HealthState::Alive(hit_points) => self.get_new_state_maybe(hit_points as i16 - modifier),
         }
     }
-
-    fn get_new_state_maybe(&self, integer_state: i16) -> HealthState {
+    
+    fn get_new_state_maybe(self, integer_state: i16) -> HealthState {
         match integer_state {
-            x if x < 0 => return HealthState::Dead,
-            x if x == 0 => return HealthState::Ko,
-            _ => return HealthState::Alive(integer_state as u16),
-        };
+            x if x < 0 =>  HealthState::Dead,
+            x if x == 0 =>  HealthState::Ko,
+            _ =>  HealthState::Alive(integer_state as u16),
+        }
     }
 }
 
@@ -178,7 +189,6 @@ struct ActionResult  {
     action_roll: u8,
     action_result: ActionResultType,
     action_damage: u16,
-    damage_done: DamageResult,
 }
 
 trait Summary <T> {
@@ -254,9 +264,9 @@ impl Summary<BattleCollectionSummary> for BattleResultCollection {
 
             if let BattleResultSummary::Summary(battle_summary) = res {
                 let winner = if battle_summary.winner == battle_summary.initiative_winner { 
-                    format!("{}*", battle_summary.winner)
+                    format!("{:?}* {}", battle_summary.winning_team, battle_summary.winner)
                 }
-                else { battle_summary.winner };
+                else { format!("{:?} {}", battle_summary.winning_team, battle_summary.winner) };
                 *accumulation.entry((battle_summary.turns_run as u16,winner)).or_insert(0) += 1;
             }
         }
@@ -282,6 +292,7 @@ struct BattleSummary {
     turns_run: u8,
     winner: String,
     initiative_winner: String,
+    winning_team: Team,
 }
 
 struct BattleAccumulation {
@@ -301,6 +312,7 @@ impl Summary<BattleResultSummary> for BattleResult {
             turns_run: self.turn_result.len() as u8, 
             winner: self.winner.name.clone(),
             initiative_winner: self.initiative_winner.clone(),
+            winning_team: self.winner.team,
         };
         Some(BattleResultSummary::Summary(battle_summary))
     }
@@ -320,7 +332,6 @@ struct BattleOrder {
 impl BattleOrder {
     fn resolve_damage(&mut self, damage: u8) -> DamageResult {
         self.character.take_damage(damage as u16);
-        // self.character.hit_points = remaining_hit_points as u8;
     
         match self.character.hs2  {
             HealthState::Alive(hp) => DamageResult{remaining_hit_points: hp as u8,target_state:HealthState::Alive(hp as u16)},
@@ -329,7 +340,7 @@ impl BattleOrder {
         }
     }
 
-    fn resolve_attack(attack_result: AttackResult, mut target: CharacterStruct, damage: u16 ) -> Option<bool> {
+    fn _resolve_attack(attack_result: AttackResult, mut target: CharacterStruct, damage: u16 ) -> Option<bool> {
         if attack_result.attack_roll > target.armour_class {
             target.take_damage(damage);
         }
@@ -434,7 +445,7 @@ fn get_winner(battle_order_list: Vec<BattleOrder>) -> Option<BattleOrder> {
     None
 }
 
-fn run_battle_turn(battle_order_list: &mut Vec<BattleOrder>, turn_number: u8) -> Option<TurnResult>{
+fn run_battle_turn(battle_order_list: &mut [BattleOrder], turn_number: u8) -> Option<TurnResult>{
     let mut turn_result = TurnResult { turn_number, ..Default::default() };
     turn_result.turn_number = turn_number;
 
@@ -445,8 +456,10 @@ fn run_battle_turn(battle_order_list: &mut Vec<BattleOrder>, turn_number: u8) ->
             match target {
                 Some(target) => {
                     let attack_result = melee_attack(battle_order_list[i].character.to_hit, battle_order_list[target].character.armour_class, battle_order_list[i].character.damage);
-                    let damage_done = battle_order_list[target].resolve_damage(attack_result.damage_roll);
-                
+                    if attack_result.attack_roll > battle_order_list[target].character.armour_class {
+                        let damage_done = battle_order_list[target].resolve_damage(attack_result.damage_roll);
+                    }
+                                    
                     let action_result =  ActionResult {
                         actor: battle_order_list[i].character.name.clone(),
                         target: battle_order_list[target].character.name.clone(),
@@ -455,7 +468,6 @@ fn run_battle_turn(battle_order_list: &mut Vec<BattleOrder>, turn_number: u8) ->
                         action_roll: attack_result.attack_roll,
                         action_result: attack_result.attack_result,
                         action_damage: attack_result.damage_roll as u16,
-                        damage_done,
                     };
                     turn_result.action_results.push(action_result);
                 }
