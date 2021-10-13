@@ -117,7 +117,7 @@ impl CharacterStruct {
         self.hs2
     }
 
-    fn react_to(){}
+    fn _react_to(){}
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, Eq, Ord, PartialEq)]
@@ -286,7 +286,6 @@ struct BattleSummary {
 
 struct BattleAccumulation {
     numer_of_battles: u32,
-
 }
 
 enum BattleResultSummary {
@@ -320,36 +319,13 @@ struct BattleOrder {
 
 impl BattleOrder {
     fn resolve_damage(&mut self, damage: u8) -> DamageResult {
-        let remaining_hit_points: i8;
         self.character.take_damage(damage as u16);
-        match self.character.hs2 {
-            HealthState::Alive(hit_points) => remaining_hit_points = hit_points as i8 - damage as i8,
-            _ => remaining_hit_points = 0,
-        };
+        // self.character.hit_points = remaining_hit_points as u8;
     
-        match remaining_hit_points  {
-            d if d < 0  => { 
-                let damage_result =  DamageResult{remaining_hit_points: 0,target_state:HealthState::Dead};
-                self.character.hit_points = 0;
-                self.character.hs2 = HealthState::Dead;
-                damage_result
-            },
-            0 => {
-                let damage_result = DamageResult{remaining_hit_points: 0,target_state:HealthState::Ko};
-                self.character.hit_points = 0;
-                self.character.hs2 = HealthState::Ko;
-                damage_result
-
-            }
-            d if d > 0 => {
-                let damage_result = DamageResult{remaining_hit_points: d as u8,target_state:HealthState::Alive(d as u16)
-                };
-                self.character.hit_points = remaining_hit_points as u8;
-                self.character.hs2 = HealthState::Alive(remaining_hit_points as u16);
-
-                damage_result
-            }
-            _ => panic!("yup we got here...resolve_damage(damage: u8, hit_points: u8)"),
+        match self.character.hs2  {
+            HealthState::Alive(hp) => DamageResult{remaining_hit_points: hp as u8,target_state:HealthState::Alive(hp as u16)},
+            HealthState::Dead => DamageResult{remaining_hit_points: 0,target_state:HealthState::Dead},
+            HealthState::Ko => DamageResult{remaining_hit_points: 0,target_state:HealthState::Ko},
         }
     }
 
