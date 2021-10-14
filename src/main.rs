@@ -7,8 +7,8 @@ use std::collections::HashMap;
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    let desired_iterations = 1_200;
-    let threads_desired: u8 = 6;
+    let desired_iterations = 100;
+    let threads_desired: u8 = 1;
     let thread_iterations = desired_iterations/threads_desired as u32;
 
     let mut battle_collection_list:Vec<BattleResultCollection> = Vec::with_capacity(6);
@@ -49,7 +49,6 @@ fn main() -> Result<(),String> {
 fn get_players() -> Vec<CharacterStruct> {
     let player1 = CharacterStruct {
         name: String::from("Hero"),
-        hit_points: 10,
         armour_class: 12,
         to_hit: 20,
         weapon: "+1",
@@ -61,7 +60,6 @@ fn get_players() -> Vec<CharacterStruct> {
 
     let player2 = CharacterStruct {
         name: String::from("Villan-A"),
-        hit_points: 6,
         armour_class: 10,
         to_hit: 20,
         weapon: "+1",
@@ -73,7 +71,6 @@ fn get_players() -> Vec<CharacterStruct> {
 
     let player3 = CharacterStruct {
         name: String::from("Villan-B"),
-        hit_points: 6,
         armour_class: 10,
         to_hit: 20,
         weapon: "+1",
@@ -90,7 +87,7 @@ fn get_players() -> Vec<CharacterStruct> {
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 struct CharacterStruct {
     name: String,
-    hit_points: u8,
+    // hit_points: u8,
     armour_class: u8,
     to_hit: u8,
     weapon: &'static str,
@@ -178,6 +175,7 @@ enum ActionType {
     _Cast,
     _Dash,
     _NoAction,
+    _NoTarget,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -352,13 +350,34 @@ struct BattleSummary {
     winning_team: Team,
 }
 
+impl fmt::Display for BattleSummary {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{},{},{},{:?}", self.battle_id, self.turns_run, self.initiative_winner, self.winning_team)
+    }
+}
+
 struct BattleAccumulation {
     numer_of_battles: u32,
+}
+
+impl fmt::Display for BattleAccumulation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.numer_of_battles)
+    }
 }
 
 enum BattleResultSummary {
     Summary(BattleSummary),
     Accumulation(BattleAccumulation),
+}
+
+impl fmt::Display for BattleResultSummary {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+           BattleResultSummary::Summary(x) => return write!(f, "{}", x),
+           BattleResultSummary::Accumulation(x) => return write!(f, "{}", x),
+        };
+    }
 }
 
 impl Summary<BattleResultSummary> for BattleResult {
@@ -384,87 +403,122 @@ struct BattleOrderList {
 }
 
 impl BattleOrderList{
-    fn run_battle(self) -> BattleResult {
-        let mut battle_result: BattleResult = Default::default();
+    fn run_battle(mut self, battle_num: u32) -> BattleResult {
+        let mut battle_result = BattleResult {
+            battle_id: battle_num.to_string(),
+            initiative_winner: self.battle_order_list[0].character.name.clone(),
+            ..Default::default()
+        };
         let mut winning_result = false;
         let mut turn_count: u8 = 0;
-        let mut turn_result: TurnResult;
+        let mut turn_result: TurnResult = Default::default();
+        let turn_result_ref = &mut turn_result;
     
         while !winning_result {
-            // self = self.run_battle_turn(turn_count);
-            // let turn_result = self.get_turn_result();
-            self = self.run_battle_turn(turn_count, turn_result);
-            println!("{:?}",self);
-            match turn_result {
-                Some(x) => {
-                    turn_count +=1;
-                    battle_result.turn_result.push(x.clone());
-                },
-                None => winning_result=true,
+            turn_result_ref.turn_number = turn_count;
+
+            self = self.run_battle_turn(turn_count, turn_result_ref);
+            if self.is_winner() {
+                println!("Winner!");
+                winning_result = true;
             }
+            battle_result.turn_result.push(turn_result_ref.clone());
+            turn_count += 1;
         }
-        let winner = self.get_winner().unwrap();
+        let winner = self.get_winner();
+        match winner {
+            Some(x) => {
+                battle_result.winner = x.character.clone();
+                println!("Winner {}", x.character.name)
+            },
+            None => {
+                let summary  = battle_result.summarize().unwrap();
+                println!("summary {}", summary )
+            },
+        }
+
         battle_result.turns_run = turn_count;
-        battle_result.winner = winner.character.clone();
         battle_result
+    }
+
+    fn is_winner(&self) -> bool {
+        let mut alive_team = None;
+
+         for player in &self.battle_order_list {
+            if player.character.is_concious() {
+                match alive_team {
+                    Some(team) => if team != player.team { return false },
+                    None => alive_team = Some(player.team),
+                };
+            }
+         }
+        true
     }
 
     fn get_winner(&self) -> Option<&BattleOrder> {
         for player in &self.battle_order_list {
-            if let HealthState::Alive(_) = player.character.hs2 {
+            if player.character.is_concious() {
                 return Some(player);
             }
         }
+        println!("{:?}",self.battle_order_list);
         None
     }
     
-    fn run_battle_turn(mut self, turn_number: u8, mut turn_result: TurnResult) -> Self {
+    fn run_battle_turn(mut self, turn_number: u8, turn_result: &mut TurnResult) -> Self {
         // fn run_battle_turn(mut self, turn_number: u8) -> Option<TurnResult>{
         turn_result.turn_number = turn_number;
         let mut action_result: ActionResult;
-        
-        for (i, actor) in self.battle_order_list.iter().enumerate() {
+        let bol = self.battle_order_list.clone();
+
+        for (i, actor) in bol.iter().enumerate() {
         // for actor in 0..self.battle_order_list.len() {
-            if let HealthState::Alive(_) = self.battle_order_list[actor].character.hs2 {
-                let target = self.battle_order_list[actor].character.select_target(&self.battle_order_list);
+            if let HealthState::Alive(_) = actor.character.hs2 {
+                let target = actor.character.select_target(&self.battle_order_list);
                 if let Some(target) = target {
-                    let a_res = self.battle_order_list[actor].make_attack();
+                    let a_res = actor.make_attack();
                     if self.battle_order_list[target].character.is_attack_successful(&a_res){
-                        let d_res = self.battle_order_list[actor].character.do_some_damage();
+                        let d_res = actor.character.do_some_damage();
                         action_result = ActionResult {
-                            actor: self.battle_order_list[actor].character.name.clone(),
+                            actor: actor.character.name.clone(),
                             target: self.battle_order_list[target].character.name.clone(),
                             action_type: ActionType::Attack,
                             action_roll: a_res.attack_roll,
                             action_result: ActionResultType::Hit,
                             action_damage: d_res.damage as u16, 
-                            action_number: turn_number as u16,
+                            action_number: i as u16,
                         };
                         turn_result.action_results.push(action_result);
                         self.battle_order_list[target].character.take_damage(d_res.damage as u16);
                     }
                     else {
                         action_result = ActionResult {
-                            actor: self.battle_order_list[actor].character.name.clone(),
+                            actor: actor.character.name.clone(),
                             target: self.battle_order_list[target].character.name.clone(),
                             action_type: ActionType::Attack,
                             action_roll: a_res.attack_roll,
                             action_result: ActionResultType::Miss,
                             action_damage: 0, 
-                            action_number: turn_number as u16,
+                            action_number: i as u16,
                         };
                         turn_result.action_results.push(action_result);
                     }
                 }
+                else {
+                    action_result = ActionResult {
+                        actor: actor.character.name.clone(),
+                        target: "no target".to_string(),
+                        action_type: ActionType::_NoTarget,
+                        action_roll: 0,
+                        action_result: ActionResultType::Miss,
+                        action_damage: 0, 
+                        action_number: i as u16,
+                    };
+                    turn_result.action_results.push(action_result);
+                }
             }
         }
         self
-    }
-
-    fn get_turn_result(&self) -> Option<TurnResult> {
-        
-        
-        None
     }
 }
 
@@ -538,7 +592,7 @@ fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8) -> Batt
     let initiative_winner = &battle_order_list.battle_order_list.iter().max_by_key(|p| p.initative_roll).expect("duff list");
 
     for battle_num in 0..battle_count {
-        let mut battle_result = battle_order_list.clone().run_battle();
+        let mut battle_result = battle_order_list.clone().run_battle(battle_num);
         battle_result.battle_id = format!("{}{:0>6}", arena_id, battle_num);
         battle_result.initiative_winner = initiative_winner.character.name.clone();
         battle_collection_list.battle_order_list = battle_order_list.battle_order_list.clone();
@@ -599,7 +653,7 @@ fn is_concious_test() {
     let mut actor = players[0].clone();
     assert_eq!(actor.is_concious(),true);
 
-    actor.take_damage(actor.hit_points as u16);
+    actor.hs2 = HealthState::Dead;
     assert_eq!(actor.is_concious(),false);
 }
 
@@ -611,4 +665,17 @@ fn take_damage_test() {
 
     actor.take_damage(5);
     assert_ne!(original_health_state,actor.hs2);
+}
+
+#[test]
+fn is_winner_test() {
+    let players = get_players();
+    let order_list = make_battle_order_list(&players);
+
+    assert_eq!(order_list.is_winner(),false);
+
+    let one_list = vec!(players[0].clone());
+    let one_order_list = make_battle_order_list(&one_list);
+
+    assert_eq!(one_order_list.is_winner(),true);
 }
