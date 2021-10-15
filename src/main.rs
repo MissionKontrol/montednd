@@ -30,6 +30,7 @@ fn main() -> Result<(),String> {
         // let summary = battle.summarize().expect("something");
         if let BattleCollectionSummary::Summary(collection) = 
             battle.summarize().expect("something") {
+                println!("Battle Summary: ");
                 println!("{}", collection.battle_count );
                 println!("{}", collection);
         }
@@ -38,6 +39,7 @@ fn main() -> Result<(),String> {
     for battle in &battle_collection_list {
         if let BattleCollectionSummary::Accumulation(collection) = 
             battle.accumulate_summary().expect("accumulator says not") {
+                println!("Battle Accumlation: ");
                 println!("{}", collection.number_of_battles);
                 println!("{}", collection)
             }
@@ -137,7 +139,7 @@ impl CharacterStruct {
 
         AttackResult { 
             attack_roll: roll,
-            roll_string: self.weapon,
+            _roll_string: self.weapon,
         }
     }
 
@@ -161,24 +163,6 @@ impl Default for Team {
     fn default() -> Self {
         Team::Heros
     }
-}
-
-#[derive(Clone, Debug, Copy)]
-enum ActionResultType {
-    _CritMiss,
-    Miss,
-    Hit,
-    _CritHit,
-}
-
-#[derive(Clone, Debug, Copy)]
-enum ActionType {
-    Attack,
-    _Dodge,
-    _Cast,
-    _Dash,
-    _NoAction,
-    _NoTarget,
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, Eq, Ord, PartialEq)]
@@ -214,9 +198,27 @@ impl HealthState {
     }
 }
 
+#[derive(Clone, Debug, Copy)]
+enum ActionResultType {
+    _CritMiss,
+    Miss,
+    Hit,
+    _CritHit,
+}
+
+#[derive(Clone, Debug, Copy)]
+enum ActionType {
+    Attack,
+    _Dodge,
+    _Cast,
+    _Dash,
+    _NoAction,
+    _NoTarget,
+}
+
 struct AttackResult {
     attack_roll: u8,
-    roll_string: &'static str,
+    _roll_string: &'static str,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -242,6 +244,19 @@ struct ActionResult  {
     action_damage: u16,
 }
 
+impl fmt::Display for ActionResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,"{},{},{},{:?},{},{:?},{}", 
+            self.action_number, 
+            self.actor,
+            self.target,
+            self.action_type, 
+            self.action_roll,
+            self.action_result,
+            self.action_damage,
+        )
+    }
+}
 
 fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8) -> BattleResultCollection {
     let battle_order_list = make_battle_order_list(players);
@@ -263,20 +278,6 @@ fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8) -> Batt
     }
 
     battle_collection_list
-}
-
-impl fmt::Display for ActionResult {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,"{},{},{},{:?},{},{:?},{}", 
-            self.action_number, 
-            self.actor,
-            self.target,
-            self.action_type, 
-            self.action_roll,
-            self.action_result,
-            self.action_damage,
-        )
-    }
 }
 
 trait Summary <T> {
@@ -401,14 +402,14 @@ impl fmt::Display for BattleAccumulation {
 
 enum BattleResultSummary {
     Summary(BattleSummary),
-    Accumulation(BattleAccumulation),
+    _Accumulation(BattleAccumulation),
 }
 
 impl fmt::Display for BattleResultSummary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
            BattleResultSummary::Summary(x) => return write!(f, "{}", x),
-           BattleResultSummary::Accumulation(x) => return write!(f, "{}", x),
+           BattleResultSummary::_Accumulation(x) => return write!(f, "{}", x),
         };
     }
 }
@@ -654,7 +655,7 @@ fn take_damage_test() {
 
 #[test]
 fn is_winner_test() {
-    let mut players = get_players();
+    let players = get_players();
     let order_list = make_battle_order_list(&players);
 
     assert_eq!(order_list.is_there_a_winner(),false);
