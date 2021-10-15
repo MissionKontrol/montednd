@@ -131,16 +131,19 @@ impl CharacterStruct {
             false
     }
 
-    // fn decide_attack(&self, target: usize) -> ActionType{
-    //     ActionType::Attack(AttackRequest {
-    //         roll_string: self.weapon,
-    //         target_index: target,
-    //     })
-    // }
+    fn make_attack(&self) -> AttackResult {
+        let mut rng = rand::thread_rng();
+        let roll = rng.gen_range(1..=self.to_hit);
+
+        AttackResult { 
+            attack_roll: roll,
+            roll_string: self.weapon,
+        }
+    }
 
     fn _defend_attack(){}
 
-    fn take_damage(&mut self, damage: u16) -> &Self {
+    fn take_damage(mut self, damage: u16) -> Self {
         self.hs2 = self.hs2.update_health_state(damage as i16);
         self
     }
@@ -178,12 +181,6 @@ enum ActionType {
     _NoTarget,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct AttackRequest {
-    roll_string: &'static str,
-    target_index: usize,
-}
-
 #[derive(Debug, Clone, Copy, PartialOrd, Eq, Ord, PartialEq)]
 enum HealthState {
     Dead,
@@ -219,8 +216,7 @@ impl HealthState {
 
 struct AttackResult {
     attack_roll: u8,
-    damage_roll: u8,
-    attack_result: ActionResultType,
+    roll_string: &'static str,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -244,6 +240,43 @@ struct ActionResult  {
     action_roll: u8,
     action_result: ActionResultType,
     action_damage: u16,
+}
+
+
+fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8) -> BattleResultCollection {
+    let battle_order_list = make_battle_order_list(players);
+    let mut battle_collection_list = BattleResultCollection {
+        battle_order_list: battle_order_list.battle_order_list.clone(),
+        battle_count,
+        arena_id,
+        ..Default::default()
+    };
+
+    let initiative_winner = &battle_order_list.battle_order_list.iter().max_by_key(|p| p.initative_roll).expect("duff list");
+
+    for battle_num in 0..battle_count {
+        let mut battle_result = battle_order_list.clone().run_battle(battle_num);
+        battle_result.battle_id = format!("{}{:0>6}", arena_id, battle_num);        // sus
+        battle_result.initiative_winner = initiative_winner.character.name.clone();
+        battle_collection_list.battle_order_list = battle_order_list.battle_order_list.clone();
+        battle_collection_list.battle_result_list.push(battle_result.clone());
+    }
+
+    battle_collection_list
+}
+
+impl fmt::Display for ActionResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,"{},{},{},{:?},{},{:?},{}", 
+            self.action_number, 
+            self.actor,
+            self.target,
+            self.action_type, 
+            self.action_roll,
+            self.action_result,
+            self.action_damage,
+        )
+    }
 }
 
 trait Summary <T> {
@@ -404,44 +437,39 @@ struct BattleOrderList {
 
 impl BattleOrderList{
     fn run_battle(mut self, battle_num: u32) -> BattleResult {
+        let mut winning_result = false;
+        let mut turn_count: u8 = 1;
+        let mut turn_result: TurnResult = Default::default();
+        let turn_result_ref = &mut turn_result;
         let mut battle_result = BattleResult {
             battle_id: battle_num.to_string(),
             initiative_winner: self.battle_order_list[0].character.name.clone(),
             ..Default::default()
         };
-        let mut winning_result = false;
-        let mut turn_count: u8 = 0;
-        let mut turn_result: TurnResult = Default::default();
-        let turn_result_ref = &mut turn_result;
     
         while !winning_result {
             turn_result_ref.turn_number = turn_count;
+            turn_count += 1;
 
             self = self.run_battle_turn(turn_count, turn_result_ref);
-            if self.is_winner() {
-                println!("Winner!");
+
+            if self.is_there_a_winner() {
                 winning_result = true;
             }
-            battle_result.turn_result.push(turn_result_ref.clone());
-            turn_count += 1;
         }
+        battle_result.turn_result.push(turn_result_ref.clone());
+
         let winner = self.get_winner();
         match winner {
-            Some(x) => {
-                battle_result.winner = x.character.clone();
-                println!("Winner {}", x.character.name)
-            },
-            None => {
-                let summary  = battle_result.summarize().unwrap();
-                println!("summary {}", summary )
-            },
-        }
+            Some(x) => battle_result.winner = x.character.clone(),
+            None => (),
+        };
 
         battle_result.turns_run = turn_count;
-        battle_result
+        battle_result.clone()
     }
 
-    fn is_winner(&self) -> bool {
+    fn is_there_a_winner(&self) -> bool {
         let mut alive_team = None;
 
          for player in &self.battle_order_list {
@@ -469,19 +497,22 @@ impl BattleOrderList{
         // fn run_battle_turn(mut self, turn_number: u8) -> Option<TurnResult>{
         turn_result.turn_number = turn_number;
         let mut action_result: ActionResult;
-        let bol = self.battle_order_list.clone();
+        let turn_order = self.battle_order_list.clone();
+        let mut casuality_list = self.battle_order_list.clone();
 
-        for (i, actor) in bol.iter().enumerate() {
-        // for actor in 0..self.battle_order_list.len() {
+        for (i, actor) in turn_order.iter().enumerate() {
+            if !casuality_list[i].character.is_concious() {
+                continue
+            }
             if let HealthState::Alive(_) = actor.character.hs2 {
-                let target = actor.character.select_target(&self.battle_order_list);
+                let target = actor.get_target(&casuality_list);
                 if let Some(target) = target {
                     let a_res = actor.make_attack();
-                    if self.battle_order_list[target].character.is_attack_successful(&a_res){
-                        let d_res = actor.character.do_some_damage();
+                    if casuality_list[target].is_attack_successful(&a_res){
+                        let d_res = actor.get_damage();
                         action_result = ActionResult {
                             actor: actor.character.name.clone(),
-                            target: self.battle_order_list[target].character.name.clone(),
+                            target: casuality_list[target].character.name.clone(),
                             action_type: ActionType::Attack,
                             action_roll: a_res.attack_roll,
                             action_result: ActionResultType::Hit,
@@ -489,7 +520,8 @@ impl BattleOrderList{
                             action_number: i as u16,
                         };
                         turn_result.action_results.push(action_result);
-                        self.battle_order_list[target].character.take_damage(d_res.damage as u16);
+                        casuality_list[target].give_damage(d_res.damage as u16);
+                        self.battle_order_list[target].give_damage(d_res.damage as u16);
                     }
                     else {
                         action_result = ActionResult {
@@ -531,75 +563,28 @@ struct BattleOrder {
 
 impl BattleOrder {
     fn make_attack(&self) -> AttackResult {
-        let mut rng = rand::thread_rng();
+        self.character.make_attack()
+    }
 
-        let roll = rng.gen_range(1..=self.character.to_hit);
-        // TODO
-        // add weapon + ability
-        AttackResult { 
-            damage_roll: roll,
-            attack_roll: roll,
-            attack_result: ActionResultType::Hit,
+    fn get_target(&self, target_list: &[BattleOrder]) -> Option<usize> {
+        self.character.select_target(target_list)
+    }
+
+    fn is_attack_successful(&self, attack_result: &AttackResult) -> bool {
+        self.character.is_attack_successful(&attack_result)
+    }
+
+    fn get_damage(&self) -> DamageResult {
+        self.character.do_some_damage()
+    }
+
+    fn give_damage(&mut self, damage: u16) -> DamageResult {
+        self.character = self.character.clone().take_damage(damage);
+        DamageResult {
+            damage: damage as u8,
         }
     }
-
-    // fn take_action(&self, target: usize) -> ActionType {
-    //     let attack_request = self.character.decide_attack(target);
-    //     let attack_ = self.make_attack(attack_request);
-    // }
-}
- 
-// fn run_turn_action(turn_number: u8, target: &mut CharacterStruct, actor: &mut CharacterStruct) -> ActionResult {
-//     let a_res = actor.make_attack();
-//     if target.attack_is_successful(&a_res){
-//         let d_res = actor.do_some_damage();
-//         target.take_damage(d_res.damage as u16);
-
-//         let action_result =  ActionResult {
-//             actor: actor.name.clone(),
-//             target: target.name.clone(),
-//             action_number: 1,                         // TODO fix  
-//             action_type: ActionType::Attack,
-//             action_roll: a_res.attack_roll,
-//             action_result: ActionResultType::Hit,
-//             action_damage: d_res.damage as u16,
-//         };
-//         action_result
-//     }
-//     else {
-//         let action_result =  ActionResult {
-//             actor: actor.name.clone(),
-//             target: target.name.clone(),
-//             action_number: 1,                         // TODO fix  
-//             action_type: ActionType::Attack,
-//             action_roll: a_res.attack_roll,
-//             action_result: ActionResultType::Miss,
-//             action_damage: 0,
-//         };
-//         action_result
-//     }
-// }
-
-fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8) -> BattleResultCollection {
-    let battle_order_list = make_battle_order_list(players);
-    let mut battle_collection_list = BattleResultCollection {
-        battle_order_list: battle_order_list.battle_order_list.clone(),
-        battle_count,
-        arena_id,
-        ..Default::default()
-    };
-
-    let initiative_winner = &battle_order_list.battle_order_list.iter().max_by_key(|p| p.initative_roll).expect("duff list");
-
-    for battle_num in 0..battle_count {
-        let mut battle_result = battle_order_list.clone().run_battle(battle_num);
-        battle_result.battle_id = format!("{}{:0>6}", arena_id, battle_num);
-        battle_result.initiative_winner = initiative_winner.character.name.clone();
-        battle_collection_list.battle_order_list = battle_order_list.battle_order_list.clone();
-        battle_collection_list.battle_result_list.push(battle_result.clone());
-    }
-
-    battle_collection_list
+    
 }
 
 fn make_battle_order_list(players: &[CharacterStruct]) -> BattleOrderList {
@@ -663,19 +648,19 @@ fn take_damage_test() {
     let mut actor = players[0].clone();
     let original_health_state = actor.hs2;
 
-    actor.take_damage(5);
+    actor = actor.take_damage(5);
     assert_ne!(original_health_state,actor.hs2);
 }
 
 #[test]
 fn is_winner_test() {
-    let players = get_players();
+    let mut players = get_players();
     let order_list = make_battle_order_list(&players);
 
-    assert_eq!(order_list.is_winner(),false);
+    assert_eq!(order_list.is_there_a_winner(),false);
 
     let one_list = vec!(players[0].clone());
     let one_order_list = make_battle_order_list(&one_list);
 
-    assert_eq!(one_order_list.is_winner(),true);
+    assert_eq!(one_order_list.is_there_a_winner(),true);
 }
