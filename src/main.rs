@@ -280,144 +280,6 @@ fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8) -> Batt
     battle_result_collection
 }
 
-trait Summary <T> {
-    fn summarize(&self) -> Option<T>;
-    fn accumulate_summary(&self) -> Option<T>;
-}
-
-#[derive(Default)]
-struct BattleResultCollection {
-    arena_id: u8,
-    battle_count: u32,
-    battle_result_list: Vec<BattleResult>,
-    battle_order_list: Vec<BattleOrder>,
-}
-
-struct CollectionSummary {
-    arena_id: u8,
-    battle_count: u32,
-    total_turns_run: u32,
-    average_turns_run: u16,
-    _max_turns_run: u8,    
-}
-
-struct CollectionAccumulation {
-    number_of_battles: u32,
-    accumulation: HashMap<(u16,String),u32>,
-}
-
-impl fmt::Display for CollectionSummary {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{},{},{},{},{}", self.arena_id, self.battle_count, self.total_turns_run, self.average_turns_run, self._max_turns_run)
-    }
-}
-
-impl fmt::Display for CollectionAccumulation {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut output = String::new();
-        for row in self.accumulation.clone() {
-            let write_row = format!("{:?} {}\n", row.0, row.1);
-            output.push_str(&write_row);
-        }
-        write!(f, "{}", output)
-    }    
-}
-
-enum BattleCollectionSummary {
-    Summary(CollectionSummary),
-    Accumulation(CollectionAccumulation),
-}
-
-impl Summary<BattleCollectionSummary> for BattleResultCollection {
-    fn summarize(&self ) -> Option<BattleCollectionSummary> {
-        let total_turns_run: u32 = self.battle_result_list.iter()
-            .fold(0u32, |acc, battle_result| acc + battle_result.turns_run as u32);
-        let battle_collection_summary = CollectionSummary {
-            arena_id: self.arena_id, 
-            battle_count: self.battle_count,
-            total_turns_run,
-            average_turns_run: (total_turns_run /self.battle_count) as u16,
-            _max_turns_run: self.battle_result_list.iter().fold(0u8, |max, battle_result| if max > battle_result.turn_result.len() as u8 { max }
-                else { battle_result.turn_result.len() as u8 }),    
-        };
-        Some(BattleCollectionSummary::Summary( battle_collection_summary))
-    }
-
-    fn accumulate_summary(&self) -> Option<BattleCollectionSummary>{
-        let mut number_of_battles: u32 = 0;
-        let mut accumulation:HashMap<(u16,String),u32> = HashMap::new();
-
-        for battle in &self.battle_result_list {
-            number_of_battles += 1;
-            let res = battle.summarize();
-
-            if let Some(BattleResultSummary::Summary(battle_summary)) = res {
-                let winner = if battle_summary.winner == battle_summary.initiative_winner { 
-                    format!("{:?}*", battle_summary.winning_team)
-                }
-                else { format!("{:?}", battle_summary.winning_team) };
-                *accumulation.entry((battle.turns_run as u16,winner)).or_insert(0) += 1;
-            }
-        }
-        let battle_collection_accumulation = CollectionAccumulation{
-            number_of_battles,
-            accumulation,
-        };
-        Some(BattleCollectionSummary::Accumulation( battle_collection_accumulation))
-    }
-}
-
-#[derive(Default, Debug, Clone)]
-struct BattleResult{
-    battle_id: String,
-    turns_run: u8,
-    winner: CharacterStruct,
-    initiative_winner: String,
-    turn_result: Vec<TurnResult>,
-}
-
-struct BattleSummary {
-    battle_id: String,
-    turns_run: u8,
-    winner: String,
-    initiative_winner: String,
-    winning_team: Team,
-}
-
-impl fmt::Display for BattleSummary {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{},{},{},{:?}", self.battle_id, self.turns_run, self.initiative_winner, self.winning_team)
-    }
-}
-
-enum BattleResultSummary {
-    Summary(BattleSummary),
-}
-
-impl fmt::Display for BattleResultSummary {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-           BattleResultSummary::Summary(x) => return write!(f, "{}", x),
-        };
-    }
-}
-
-impl Summary<BattleResultSummary> for BattleResult {
-    fn summarize(&self) -> Option<BattleResultSummary> {
-        let battle_summary = BattleSummary {
-            battle_id: self.battle_id.clone(), 
-            turns_run: self.turns_run as u8, 
-            winner: self.winner.name.clone(),
-            initiative_winner: self.initiative_winner.clone(),
-            winning_team: self.winner.team,
-        };
-        Some(BattleResultSummary::Summary(battle_summary))
-    }
-
-    fn accumulate_summary(&self) -> Option<BattleResultSummary>{
-        todo!()
-    }
-}
 
 #[derive(Clone, Debug)]
 struct BattleOrderList {
@@ -594,6 +456,145 @@ fn make_battle_order_list(players: &[CharacterStruct]) -> BattleOrderList {
     }
     battle_order_list.sort_by(|a,b| b.initative_roll.cmp(&a.initative_roll) );
     BattleOrderList { battle_order_list }
+}
+
+trait Summary <T> {
+    fn summarize(&self) -> Option<T>;
+    fn accumulate_summary(&self) -> Option<T>;
+}
+
+#[derive(Default)]
+struct BattleResultCollection {
+    arena_id: u8,
+    battle_count: u32,
+    battle_result_list: Vec<BattleResult>,
+    battle_order_list: Vec<BattleOrder>,
+}
+
+struct CollectionSummary {
+    arena_id: u8,
+    battle_count: u32,
+    total_turns_run: u32,
+    average_turns_run: u16,
+    _max_turns_run: u8,    
+}
+
+struct CollectionAccumulation {
+    number_of_battles: u32,
+    accumulation: HashMap<(u16,String),u32>,
+}
+
+impl fmt::Display for CollectionSummary {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{},{},{},{},{}", self.arena_id, self.battle_count, self.total_turns_run, self.average_turns_run, self._max_turns_run)
+    }
+}
+
+impl fmt::Display for CollectionAccumulation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut output = String::new();
+        for row in self.accumulation.clone() {
+            let write_row = format!("{:?} {}\n", row.0, row.1);
+            output.push_str(&write_row);
+        }
+        write!(f, "{}", output)
+    }    
+}
+
+enum BattleCollectionSummary {
+    Summary(CollectionSummary),
+    Accumulation(CollectionAccumulation),
+}
+
+impl Summary<BattleCollectionSummary> for BattleResultCollection {
+    fn summarize(&self ) -> Option<BattleCollectionSummary> {
+        let total_turns_run: u32 = self.battle_result_list.iter()
+            .fold(0u32, |acc, battle_result| acc + battle_result.turns_run as u32);
+        let battle_collection_summary = CollectionSummary {
+            arena_id: self.arena_id, 
+            battle_count: self.battle_count,
+            total_turns_run,
+            average_turns_run: (total_turns_run /self.battle_count) as u16,
+            _max_turns_run: self.battle_result_list.iter().fold(0u8, |max, battle_result| if max > battle_result.turn_result.len() as u8 { max }
+                else { battle_result.turn_result.len() as u8 }),    
+        };
+        Some(BattleCollectionSummary::Summary( battle_collection_summary))
+    }
+
+    fn accumulate_summary(&self) -> Option<BattleCollectionSummary>{
+        let mut number_of_battles: u32 = 0;
+        let mut accumulation:HashMap<(u16,String),u32> = HashMap::new();
+
+        for battle in &self.battle_result_list {
+            number_of_battles += 1;
+            let res = battle.summarize();
+
+            if let Some(BattleResultSummary::Summary(battle_summary)) = res {
+                let winner = if battle_summary.winner == battle_summary.initiative_winner { 
+                    format!("{:?}*", battle_summary.winning_team)
+                }
+                else { format!("{:?}", battle_summary.winning_team) };
+                *accumulation.entry((battle.turns_run as u16,winner)).or_insert(0) += 1;
+            }
+        }
+        let battle_collection_accumulation = CollectionAccumulation{
+            number_of_battles,
+            accumulation,
+        };
+        Some(BattleCollectionSummary::Accumulation( battle_collection_accumulation))
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+struct BattleResult{
+    battle_id: String,
+    turns_run: u8,
+    winner: CharacterStruct,
+    initiative_winner: String,
+    turn_result: Vec<TurnResult>,
+}
+
+struct BattleSummary {
+    battle_id: String,
+    turns_run: u8,
+    winner: String,
+    initiative_winner: String,
+    winning_team: Team,
+}
+
+impl fmt::Display for BattleSummary {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{},{},{},{:?}", self.battle_id, self.turns_run, self.initiative_winner, self.winning_team)
+    }
+}
+
+enum BattleResultSummary {
+    Summary(BattleSummary),
+}
+
+impl fmt::Display for BattleResultSummary {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+           BattleResultSummary::Summary(x) => return write!(f, "{}", x),
+        };
+    }
+}
+
+impl Summary<BattleResultSummary> for BattleResult {
+    fn summarize(&self) -> Option<BattleResultSummary> {
+        let battle_summary = BattleSummary {
+            battle_id: self.battle_id.clone(), 
+            turns_run: self.turns_run as u8, 
+            winner: self.winner.name.clone(),
+            initiative_winner: self.initiative_winner.clone(),
+            winning_team: self.winner.team,
+        };
+        Some(BattleResultSummary::Summary(battle_summary))
+    }
+
+    fn accumulate_summary(&self) -> Option<BattleResultSummary>{
+        todo!()
+    }
 }
 
 #[test]
