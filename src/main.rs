@@ -18,7 +18,7 @@ fn main() -> Result<(),String> {
         let local_player_vec = player_vec.clone();
         thread_list.push(thread::spawn(move||
             {
-                battle(&local_player_vec, thread_iterations, i as u8)
+                battle(&local_player_vec, thread_iterations, i as u8, ReportOutputLevel::None)
             }));   
     }
  
@@ -80,6 +80,56 @@ fn get_players() -> Vec<CharacterStruct> {
 
     let player_vec = vec!(player1,player2,player3);
     player_vec
+}
+
+fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_level: ReportOutputLevel) -> BattleResultCollection {
+    let battle_order_list = make_battle_order_list(players, report_level);
+    let mut battle_result_collection = BattleResultCollection {
+        battle_order_list: battle_order_list.battle_order_list.clone(),
+        battle_count,
+        arena_id,
+        ..Default::default()
+    };
+
+    let initiative_winner = &battle_order_list.battle_order_list.iter().max_by_key(|p| p.initative_roll).expect("duff list");
+    battle_result_collection.battle_order_list = battle_order_list.battle_order_list.clone();
+
+    for battle_num in 0..battle_count {
+        let mut battle_result = battle_order_list.clone().run_battle(battle_num);
+        battle_result.battle_id = format!("{}{:0>6}", arena_id, battle_num);        // sus
+        battle_result.initiative_winner = initiative_winner.character.name.clone();
+        battle_result_collection.battle_result_list.push(battle_result.clone());
+    }
+
+    battle_result_collection
+}
+
+fn make_battle_order_list(players: &[CharacterStruct], report_level: ReportOutputLevel) -> BattleOrderList {
+    let mut rng = rand::thread_rng();
+    let mut battle_order_list = Vec::new();
+    
+    for player in players {
+        let initative_roll = rng.gen_range(1..=20);
+        let order = BattleOrder {
+            initative_roll,
+            character: player.clone(),
+            team: player.team,
+        };
+        battle_order_list.push(order);
+    }
+    battle_order_list.sort_by(|a,b| b.initative_roll.cmp(&a.initative_roll));
+    BattleOrderList { battle_order_list, report_level, }
+}
+
+#[derive(Clone, Debug)]
+enum ReportOutputLevel {
+    None,
+    Summary,
+    Accumulate,
+}
+
+impl Default for ReportOutputLevel {
+    fn default() -> Self { ReportOutputLevel::None }
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -156,9 +206,7 @@ enum Team {
 }
 
 impl Default for Team {
-    fn default() -> Self {
-        Team::Heros
-    }
+    fn default() -> Self { Team::Heros }
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, Eq, Ord, PartialEq)]
@@ -272,32 +320,10 @@ impl fmt::Display for ActionResult {
     }
 }
 
-fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8) -> BattleResultCollection {
-    let battle_order_list = make_battle_order_list(players);
-    let mut battle_result_collection = BattleResultCollection {
-        battle_order_list: battle_order_list.battle_order_list.clone(),
-        battle_count,
-        arena_id,
-        ..Default::default()
-    };
-
-    let initiative_winner = &battle_order_list.battle_order_list.iter().max_by_key(|p| p.initative_roll).expect("duff list");
-    battle_result_collection.battle_order_list = battle_order_list.battle_order_list.clone();
-
-    for battle_num in 0..battle_count {
-        let mut battle_result = battle_order_list.clone().run_battle(battle_num);
-        battle_result.battle_id = format!("{}{:0>6}", arena_id, battle_num);        // sus
-        battle_result.initiative_winner = initiative_winner.character.name.clone();
-        battle_result_collection.battle_result_list.push(battle_result.clone());
-    }
-
-    battle_result_collection
-}
-
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 struct BattleOrderList {
     battle_order_list: Vec<BattleOrder>,
+    report_level: ReportOutputLevel,
 }
 
 impl BattleOrderList{
@@ -453,23 +479,6 @@ impl BattleOrder {
     
 }
 
-fn make_battle_order_list(players: &[CharacterStruct]) -> BattleOrderList {
-    let mut rng = rand::thread_rng();
-    let mut battle_order_list = Vec::new();
-    
-    for player in players {
-        let initative_roll = rng.gen_range(1..=20);
-        let order = BattleOrder {
-            initative_roll,
-            character: player.clone(),
-            team: player.team,
-        };
-        battle_order_list.push(order);
-    }
-    battle_order_list.sort_by(|a,b| b.initative_roll.cmp(&a.initative_roll) );
-    BattleOrderList { battle_order_list }
-}
-
 trait Summary <T, B> {
     fn summarize(&self) -> Option<T>;
     fn accumulate_summary(&self) -> Option<B>;
@@ -599,14 +608,14 @@ impl Summary<BattleSummary, BattleAccumulator> for BattleResult {
 #[test]
 fn test_make_battle_order_list() {
     let players = get_players(); 
-    let test_list = make_battle_order_list(&players);
+    let test_list = make_battle_order_list(&players, ReportOutputLevel::Summary);
     assert_ne!(test_list.battle_order_list.len(),0,"no list");
 }
 
 #[test]
 fn test_order_of_make_battler_order_list() {
     let players = get_players();
-    let test_list = make_battle_order_list(&players);
+    let test_list = make_battle_order_list(&players, ReportOutputLevel::Summary);
     assert_eq!(test_list.battle_order_list[0].initative_roll > test_list.battle_order_list[1].initative_roll,true,"list not ordered");
 }
 
@@ -619,7 +628,7 @@ fn get_players_test() {
 #[test]
 fn select_target_test() {
     let players = get_players();
-    let test_list = make_battle_order_list(&players);
+    let test_list = make_battle_order_list(&players, ReportOutputLevel::Summary);
     let target = test_list.battle_order_list[0].character.select_target(&test_list.battle_order_list);
 
     assert_ne!(target,Some(0),"select_target selected self");
@@ -656,12 +665,12 @@ fn take_damage_test() {
 #[test]
 fn is_winner_test() {
     let players = get_players();
-    let order_list = make_battle_order_list(&players);
+    let order_list = make_battle_order_list(&players, ReportOutputLevel::Summary);
 
     assert_eq!(order_list.is_there_a_winner(),false);
 
     let one_list = vec!(players[0].clone());
-    let one_order_list = make_battle_order_list(&one_list);
+    let one_order_list = make_battle_order_list(&one_list, ReportOutputLevel::Summary);
 
     assert_eq!(one_order_list.is_there_a_winner(),true);
 }
