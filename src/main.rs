@@ -7,7 +7,7 @@ use std::collections::HashMap;
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    let desired_iterations = 100;
+    let desired_iterations = 50;
     let threads_desired: u8 = 1;
     let thread_iterations = desired_iterations/threads_desired as u32;
 
@@ -101,9 +101,9 @@ struct CharacterStruct {
 
 impl CharacterStruct {
     fn select_target(&self, combatant_list: &[BattleOrder]) -> Option<usize> {
-        for i in  0..combatant_list.len() {
-            if combatant_list[i].character.team != self.team &&
-                combatant_list[i].character.is_concious() {
+        for (i, target) in combatant_list.iter().enumerate() {
+            if target.character.team != self.team &&
+                target.character.is_concious() {
                     return Some(i)
             }
         }
@@ -260,7 +260,7 @@ impl fmt::Display for ActionResult {
 
 fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8) -> BattleResultCollection {
     let battle_order_list = make_battle_order_list(players);
-    let mut battle_collection_list = BattleResultCollection {
+    let mut battle_result_collection = BattleResultCollection {
         battle_order_list: battle_order_list.battle_order_list.clone(),
         battle_count,
         arena_id,
@@ -268,16 +268,16 @@ fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8) -> Batt
     };
 
     let initiative_winner = &battle_order_list.battle_order_list.iter().max_by_key(|p| p.initative_roll).expect("duff list");
+    battle_result_collection.battle_order_list = battle_order_list.battle_order_list.clone();
 
     for battle_num in 0..battle_count {
         let mut battle_result = battle_order_list.clone().run_battle(battle_num);
         battle_result.battle_id = format!("{}{:0>6}", arena_id, battle_num);        // sus
         battle_result.initiative_winner = initiative_winner.character.name.clone();
-        battle_collection_list.battle_order_list = battle_order_list.battle_order_list.clone();
-        battle_collection_list.battle_result_list.push(battle_result.clone());
+        battle_result_collection.battle_result_list.push(battle_result.clone());
     }
 
-    battle_collection_list
+    battle_result_collection
 }
 
 trait Summary <T> {
@@ -303,7 +303,7 @@ struct CollectionSummary {
 
 struct CollectionAccumulation {
     number_of_battles: u32,
-    accumulation: HashMap<(u16,String),u16>,
+    accumulation: HashMap<(u16,String),u32>,
 }
 
 impl fmt::Display for CollectionSummary {
@@ -345,18 +345,18 @@ impl Summary<BattleCollectionSummary> for BattleResultCollection {
 
     fn accumulate_summary(&self) -> Option<BattleCollectionSummary>{
         let mut number_of_battles: u32 = 0;
-        let mut accumulation:HashMap<(u16,String),u16> = HashMap::new();
+        let mut accumulation:HashMap<(u16,String),u32> = HashMap::new();
 
         for battle in &self.battle_result_list {
             number_of_battles += 1;
-            let res = battle.summarize()?;
+            let res = battle.summarize();
 
-            if let BattleResultSummary::Summary(battle_summary) = res {
+            if let Some(BattleResultSummary::Summary(battle_summary)) = res {
                 let winner = if battle_summary.winner == battle_summary.initiative_winner { 
-                    format!("{:?}* {}", battle_summary.winning_team, battle_summary.winner)
+                    format!("{:?}*", battle_summary.winning_team)
                 }
-                else { format!("{:?} {}", battle_summary.winning_team, battle_summary.winner) };
-                *accumulation.entry((battle_summary.turns_run as u16,winner)).or_insert(0) += 1;
+                else { format!("{:?}", battle_summary.winning_team) };
+                *accumulation.entry((battle.turns_run as u16,winner)).or_insert(0) += 1;
             }
         }
         let battle_collection_accumulation = CollectionAccumulation{
@@ -390,26 +390,14 @@ impl fmt::Display for BattleSummary {
     }
 }
 
-struct BattleAccumulation {
-    numer_of_battles: u32,
-}
-
-impl fmt::Display for BattleAccumulation {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.numer_of_battles)
-    }
-}
-
 enum BattleResultSummary {
     Summary(BattleSummary),
-    _Accumulation(BattleAccumulation),
 }
 
 impl fmt::Display for BattleResultSummary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
            BattleResultSummary::Summary(x) => return write!(f, "{}", x),
-           BattleResultSummary::_Accumulation(x) => return write!(f, "{}", x),
         };
     }
 }
@@ -418,7 +406,7 @@ impl Summary<BattleResultSummary> for BattleResult {
     fn summarize(&self) -> Option<BattleResultSummary> {
         let battle_summary = BattleSummary {
             battle_id: self.battle_id.clone(), 
-            turns_run: self.turn_result.len() as u8, 
+            turns_run: self.turns_run as u8, 
             winner: self.winner.name.clone(),
             initiative_winner: self.initiative_winner.clone(),
             winning_team: self.winner.team,
@@ -439,7 +427,7 @@ struct BattleOrderList {
 impl BattleOrderList{
     fn run_battle(mut self, battle_num: u32) -> BattleResult {
         let mut winning_result = false;
-        let mut turn_count: u8 = 1;
+        let mut turn_count: u8 = 0;
         let mut turn_result: TurnResult = Default::default();
         let turn_result_ref = &mut turn_result;
         let mut battle_result = BattleResult {
@@ -450,24 +438,29 @@ impl BattleOrderList{
     
         while !winning_result {
             turn_result_ref.turn_number = turn_count;
-            turn_count += 1;
 
-            self = self.run_battle_turn(turn_count, turn_result_ref);
+            self = self.run_battle_turn(turn_result_ref);
 
             if self.is_there_a_winner() {
                 winning_result = true;
+            }
+            else {
+                turn_count += 1;
             }
         }
         battle_result.turn_result.push(turn_result_ref.clone());
 
         let winner = self.get_winner();
-        match winner {
-            Some(x) => battle_result.winner = x.character.clone(),
-            None => (),
-        };
+        if let Some(body) = winner {
+            battle_result.winner = body.character.clone()
+        }
 
         battle_result.turns_run = turn_count;
-        battle_result.clone()
+        let result_summary = battle_result.summarize();
+        if let Some(summary) = result_summary {     
+            println!("{}",summary);           
+        }
+        battle_result
     }
 
     fn is_there_a_winner(&self) -> bool {
@@ -494,9 +487,7 @@ impl BattleOrderList{
         None
     }
     
-    fn run_battle_turn(mut self, turn_number: u8, turn_result: &mut TurnResult) -> Self {
-        // fn run_battle_turn(mut self, turn_number: u8) -> Option<TurnResult>{
-        turn_result.turn_number = turn_number;
+    fn run_battle_turn(mut self, turn_result: &mut TurnResult) -> Self {
         let mut action_result: ActionResult;
         let turn_order = self.battle_order_list.clone();
         let mut casuality_list = self.battle_order_list.clone();
@@ -664,4 +655,20 @@ fn is_winner_test() {
     let one_order_list = make_battle_order_list(&one_list);
 
     assert_eq!(one_order_list.is_there_a_winner(),true);
+}
+
+#[test]
+fn is_attack_successful() {
+    let players = get_players();
+    let successful_attack = AttackResult {
+        attack_roll: 20,
+        _roll_string: "1d12",
+    };
+    let failure_attack = AttackResult {
+        attack_roll: 1,
+        _roll_string: "1d12",
+    };
+
+    assert_eq!(players[0].is_attack_successful(&successful_attack),true);
+    assert_eq!(players[0].is_attack_successful(&failure_attack),false);
 }
