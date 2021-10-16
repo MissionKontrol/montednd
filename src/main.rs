@@ -7,8 +7,8 @@ use std::collections::HashMap;
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    let desired_iterations = 5_000_000;
-    let threads_desired: u8 = 5;
+    let desired_iterations = 5_000;
+    let threads_desired: u8 = 1;
     let thread_iterations = desired_iterations/threads_desired as u32;
 
     let mut battle_collection_list:Vec<BattleResultCollection> = Vec::with_capacity(6);
@@ -230,12 +230,11 @@ struct TurnResult {
 }
 
 struct TurnResultSummary {
-    action_count: u8,
-    number_of_hits: u8,
+    _action_count: u8,
+    _number_of_hits: u8,
 }
 
 struct TurnResultAccumulator {
-    
 }
 
 impl Summary<TurnResultSummary, TurnResultAccumulator> for TurnResult {
@@ -339,30 +338,6 @@ impl BattleOrderList{
         }
         battle_result
     }
-
-    fn is_there_a_winner(&self) -> bool {
-        let mut alive_team = None;
-
-         for player in &self.battle_order_list {
-            if player.character.is_concious() {
-                match alive_team {
-                    Some(team) => if team != player.team { return false },
-                    None => alive_team = Some(player.team),
-                };
-            }
-         }
-        true
-    }
-
-    fn get_winner(&self) -> Option<&BattleOrder> {
-        for player in &self.battle_order_list {
-            if player.character.is_concious() {
-                return Some(player);
-            }
-        }
-        println!("get_winner but none found in {:?}",self.battle_order_list);
-        None
-    }
     
     fn run_battle_turn(mut self, turn_result: &mut TurnResult) -> Self {
         let mut action_result: ActionResult;
@@ -418,6 +393,30 @@ impl BattleOrderList{
             }
         }
         self
+    }
+
+    fn is_there_a_winner(&self) -> bool {
+        let mut alive_team = None;
+
+         for player in &self.battle_order_list {
+            if player.character.is_concious() {
+                match alive_team {
+                    Some(team) => if team != player.team { return false },
+                    None => alive_team = Some(player.team),
+                };
+            }
+         }
+        true
+    }
+
+    fn get_winner(&self) -> Option<&BattleOrder> {
+        for player in &self.battle_order_list {
+            if player.character.is_concious() {
+                return Some(player);
+            }
+        }
+        println!("get_winner but none found in {:?}",self.battle_order_list);
+        None
     }
 }
 
@@ -512,11 +511,6 @@ impl fmt::Display for CollectionAccumulation {
         }
         write!(f, "{}", output)
     }    
-}
-
-enum BattleCollectionSummary {
-    Summary(CollectionSummary),
-    Accumulation(CollectionAccumulation),
 }
 
 impl Summary<CollectionSummary, CollectionAccumulation> for BattleResultCollection {
@@ -626,7 +620,13 @@ fn get_players_test() {
 fn select_target_test() {
     let players = get_players();
     let test_list = make_battle_order_list(&players);
-    assert_ne!(test_list.battle_order_list[0].character.select_target(&test_list.battle_order_list),Some(0))
+    let target = test_list.battle_order_list[0].character.select_target(&test_list.battle_order_list);
+
+    assert_ne!(target,Some(0),"select_target selected self");
+    match target {
+        Some(index) => assert_eq!(test_list.battle_order_list[index].character.is_concious(),true),
+        None => ()
+    }
 }
 
 #[test]
@@ -635,6 +635,9 @@ fn is_concious_test() {
 
     let mut actor = players[0].clone();
     assert_eq!(actor.is_concious(),true);
+
+    actor.hs2 = HealthState::Ko;
+    assert_eq!(actor.is_concious(),false);
 
     actor.hs2 = HealthState::Dead;
     assert_eq!(actor.is_concious(),false);
