@@ -4,6 +4,8 @@ use std::thread;
 use rand::Rng;
 use std::collections::HashMap;
 
+mod dice_thrower;
+
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
@@ -109,6 +111,9 @@ fn make_battle_order_list(players: &[CharacterStruct], report_level: &ReportOutp
     let mut battle_order_list = Vec::new();
     
     for player in players {
+        let initiative_die = "1d20".to_string();
+        let roll_request = dice_thrower::parse_request(&initiative_die);
+
         let initative_roll = rng.gen_range(1..=20);
         let order = BattleOrder {
             initative_roll,
