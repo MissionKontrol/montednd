@@ -7,9 +7,9 @@ use std::collections::HashMap;
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    let desired_iterations = 5_000;
+    let desired_iterations: u32 = 5_000;
     let threads_desired: u8 = 1;
-    let thread_iterations = desired_iterations/threads_desired as u32;
+    let thread_iterations = desired_iterations/u32::from(threads_desired);
 
     let mut battle_collection_list:Vec<BattleResultCollection> = Vec::with_capacity(6);
     let mut thread_list: Vec<thread::JoinHandle<_>> = Vec::with_capacity(6);
@@ -132,7 +132,7 @@ fn make_battle_order_list(players: &[CharacterStruct], report_level: &ReportOutp
 }
 
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 enum ReportOutputLevel {
     None,
     Summary,
@@ -169,8 +169,7 @@ impl CharacterStruct {
 
     fn is_concious(&self) ->  bool {
         match self.hs2 {
-            HealthState::Dead => false,
-            HealthState::Ko => false,
+            HealthState::Dead | HealthState::Ko => false,
             HealthState::Alive(_) => true,
         }
     }
@@ -539,13 +538,13 @@ impl fmt::Display for CollectionAccumulation {
 impl Summary<CollectionSummary, CollectionAccumulation> for BattleResultCollection {
     fn summarize(&self ) -> Option<CollectionSummary> {
         let total_turns_run: u32 = self.battle_result_list.iter()
-            .fold(0u32, |acc, battle_result| acc + battle_result.turns_run as u32);
+            .fold(0_u32, |acc, battle_result| acc + battle_result.turns_run as u32);
         let battle_collection_summary = CollectionSummary {
             arena_id: self.arena_id, 
             battle_count: self.battle_count,
             total_turns_run,
             average_turns_run: (total_turns_run /self.battle_count) as u16,
-            _max_turns_run: self.battle_result_list.iter().fold(0u8, |max, battle_result| if max > battle_result.turn_result.len() as u8 { max }
+            _max_turns_run: self.battle_result_list.iter().fold(0_u8, |max, battle_result| if max > battle_result.turn_result.len() as u8 { max }
                 else { battle_result.turn_result.len() as u8 }),    
         };
         Some(battle_collection_summary)
