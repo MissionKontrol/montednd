@@ -3,7 +3,6 @@ use std::thread;
 // use std::fmt::Write;
 use rand::Rng;
 use std::collections::HashMap;
-use std::mem::size_of;
 
 mod dice_thrower;
 
