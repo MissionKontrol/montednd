@@ -30,27 +30,32 @@ fn main() -> Result<(),String> {
     }
 
     let summary_writer = file_writer::new("./output/foo.txt");
-        for battle in &battle_collection_list {
-            let mut buffer: String;
-            let collection = battle.summarize().unwrap();
-            buffer = format!("{}",collection);
-        summary_writer.write_buffer(&buffer);
+    match summary_writer {
+        file_writer::FileWriter::Ready(_) => {
+            for battle in &battle_collection_list {
+                let mut buffer: String;
+                let collection = battle.summarize().unwrap();
+                buffer = format!("{}",collection);
+                summary_writer.write_buffer(&buffer);
+            }
         }
-    // ::new("./ouput/test1.foo");
+        file_writer::FileWriter::Error(error) => println!("{}", error),
+    };
+        
 
-    for battle in &battle_collection_list {
-        let collection = battle.summarize().expect("something");
-                println!("Battle Summary: ");
-                println!("{}", collection.battle_count );
-                println!("{}", collection);
-        }
+    // for battle in &battle_collection_list {
+    //     let collection = battle.summarize().expect("something");
+    //             println!("Battle Summary: ");
+    //             println!("{}", collection.battle_count );
+    //             println!("{}", collection);
+    //     }
 
-    for battle in &battle_collection_list {
-        let collection = battle.accumulate_summary().expect("accumulator says not");
-                println!("Battle Accumlation: ");
-                println!("{}", collection.number_of_battles);
-                println!("{}", collection)
-    }
+    // for battle in &battle_collection_list {
+    //     let collection = battle.accumulate_summary().expect("accumulator says not");
+    //             println!("Battle Accumlation: ");
+    //             println!("{}", collection.number_of_battles);
+    //             println!("{}", collection)
+    // }
 
     Ok(())
 }
