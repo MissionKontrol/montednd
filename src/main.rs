@@ -3,6 +3,7 @@ use std::thread;
 // use std::fmt::Write;
 use rand::Rng;
 use std::collections::HashMap;
+use std::mem::size_of;
 
 mod dice_thrower;
 
@@ -51,7 +52,7 @@ fn get_players() -> Vec<CharacterStruct> {
         name: String::from("Hero"),
         armour_class: 12,
         to_hit: 20,
-        weapon: "+1",
+        weapon: "1d6",
         actions_per_round: 1,
         damage: 6,  
         team: Team::Heros,
@@ -62,7 +63,7 @@ fn get_players() -> Vec<CharacterStruct> {
         name: String::from("Villan-A"),
         armour_class: 10,
         to_hit: 20,
-        weapon: "+1",
+        weapon: "1d4",
         actions_per_round: 1,
         damage: 4,  
         team: Team::Villains,
@@ -73,7 +74,7 @@ fn get_players() -> Vec<CharacterStruct> {
         name: String::from("Villan-B"),
         armour_class: 10,
         to_hit: 20,
-        weapon: "+1",
+        weapon: "1d4",
         actions_per_round: 1,
         damage: 4,  
         team: Team::Villains,
@@ -107,11 +108,11 @@ fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_
 }
 
 fn make_battle_order_list(players: &[CharacterStruct], report_level: &ReportOutputLevel) -> BattleOrderList {
-    let mut battle_order_list = Vec::new();
+    let mut battle_order_list: Vec<BattleOrder> = Vec::with_capacity(players.len());
+    let initiative_die = "1d20".to_string();
+    let roll_request = dice_thrower::parse_request(&initiative_die).unwrap();
     
     for player in players {
-        let initiative_die = "1d20".to_string();
-        let roll_request = dice_thrower::parse_request(&initiative_die).unwrap();
         let initative_roll = dice_thrower::throw_roll(&roll_request);
         
         let order = BattleOrder {

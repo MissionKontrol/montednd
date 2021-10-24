@@ -80,15 +80,14 @@ fn tokenize(mut request_string: String) -> Vec<RequestToken> {
     request_token_list
 }
 
-
 fn make_request_token(in_token: &str) -> RequestToken {
     let token_parts = in_token.split('d').collect::<Vec<&str>>();
 
     match token_parts.len() {
-        1 => return RequestToken::Modifier(DiceThrowModifier {operator: ModifierOperators::Add,
+        1 => RequestToken::Modifier(DiceThrowModifier {operator: ModifierOperators::Add,
             value: token_parts[0].parse().unwrap()}),
-        2 => return RequestToken::Dice(DiceThrowDescription {number_of_dice: token_parts[0].parse().unwrap_or(1),
+        2 => RequestToken::Dice(DiceThrowDescription {number_of_dice: token_parts[0].parse().unwrap_or(1),
             number_of_die_sides: token_parts[1].parse().unwrap()}),
-        _ => return RequestToken::Error,
-        };
+        _ => RequestToken::Error,
+        }
 }
