@@ -30,7 +30,6 @@ fn main() -> Result<(),String> {
     }
 
     for battle in &battle_collection_list {
-        // let summary = battle.summarize().expect("something");
         let collection = battle.summarize().expect("something");
                 println!("Battle Summary: ");
                 println!("{}", collection.battle_count );
@@ -180,10 +179,10 @@ impl CharacterStruct {
     }
 
     fn do_some_damage(&self) -> DamageResult {
-        let mut rng = rand::thread_rng();
+        let roll_request = dice_thrower::parse_request(&self.weapon.to_string()).unwrap();
 
         DamageResult {
-            damage: rng.gen_range(1..=self.damage),
+            damage: dice_thrower::throw_roll(&roll_request) as u8,
         }
     }
 
@@ -461,6 +460,10 @@ impl BattleOrderList{
         }
         println!("get_winner but none found in {:?}",self.battle_order_list);
         None
+    }
+
+    fn get_initiative_winner(&self) -> CharacterStruct {
+        self.battle_order_list[0].character.clone()
     }
 }
 
