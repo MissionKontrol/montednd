@@ -5,6 +5,7 @@ use rand::Rng;
 use std::collections::HashMap;
 
 mod dice_thrower;
+mod file_writer;
 
 fn main() -> Result<(),String> {
     let player_vec = get_players();
@@ -27,6 +28,8 @@ fn main() -> Result<(),String> {
     for thread_counter in thread_list {
         battle_collection_list.push(thread_counter.join().unwrap());
     }
+
+    let summary_writer = file_writer::new("./ouput/test1.foo");
 
     for battle in &battle_collection_list {
         let collection = battle.summarize().expect("something");

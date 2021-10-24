@@ -26,7 +26,7 @@ fn roll_dice(num_dice: u16, num_sides: u8) -> RollResult{
     for _i in 1..=num_dice {
         roll_result.total += rng.gen_range(1..=num_sides) as u16;
     }
-    println!("{} {} {}", num_dice, num_sides,roll_result.total);
+    // println!("{} {} {}", num_dice, num_sides,roll_result.total);
     roll_result
 }
 

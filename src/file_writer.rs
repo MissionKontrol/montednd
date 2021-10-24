@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::fs::OpenOptions;
 
 fn main() {
     let config = get_config();
@@ -11,30 +12,40 @@ fn main() {
 }
 
 struct SetupConfiguration {
-    path: String,
     file_name: String,
 }
 
-impl SetupConfiguration {
-    fn get_full_path_filename(&self) -> String {
-        let full_array = [self.path.clone(), "/".to_string(), self.file_name.clone()];
-        full_array.join("")
+struct FileWriterHandle {
+    config: SetupConfiguration,
+    file_handle: std::fs::File,
+}
+
+pub enum FileWriter {
+    Error(std::io::Error),
+    Ready(std::fs::File),
+}
+
+impl FileWriter {
+    pub fn new(file_name: &str) -> FileWriter {
+        let file_result = OpenOptions::new().write(true).append(true).open(file_name);
+
+        match file_result {
+            Ok(file) => FileWriter::Ready(file),
+            Err(error) => FileWriter::Error(error),
+        }
+    }
+
+    pub fn write_buffer(self, buffer: &str) -> Result<std::io::Result<()>,FileWriter> {
+        if let FileWriter::Ready(file) = self{
+            let mut f = BufWriter::new(file);
+            Ok(f.write_all(buffer.as_bytes()))
+        }
+        else { Err(self) }
     }
 }
+
 fn get_config() -> SetupConfiguration {
     SetupConfiguration {
-        path: "./output".to_string(),
         file_name: "test.out".to_string(),
     }
-}
-
-#[test]
-fn get_full_path_filename_test() {
-    let config = SetupConfiguration {
-        path: "./output".to_string(),
-        file_name: "test.out".to_string(),
-    };
-
-    let result = config.get_full_path_filename();
-    assert_eq!(result, "./output/test.out");
 }
