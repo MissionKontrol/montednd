@@ -29,7 +29,14 @@ fn main() -> Result<(),String> {
         battle_collection_list.push(thread_counter.join().unwrap());
     }
 
-    let summary_writer = file_writer::new("./ouput/test1.foo");
+    let summary_writer = file_writer::new("./output/foo.txt");
+        for battle in &battle_collection_list {
+            let mut buffer: String;
+            let collection = battle.summarize().unwrap();
+            buffer = format!("{}",collection);
+        summary_writer.write_buffer(&buffer);
+        }
+    // ::new("./ouput/test1.foo");
 
     for battle in &battle_collection_list {
         let collection = battle.summarize().expect("something");

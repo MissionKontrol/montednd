@@ -26,21 +26,25 @@ pub enum FileWriter {
 }
 
 impl FileWriter {
-    pub fn new(file_name: &str) -> FileWriter {
-        let file_result = OpenOptions::new().write(true).append(true).open(file_name);
-
-        match file_result {
-            Ok(file) => FileWriter::Ready(file),
-            Err(error) => FileWriter::Error(error),
+    pub fn write_buffer(&self, buffer: &str) -> Result<std::io::Result<()>,String> {
+        match self {
+            FileWriter::Ready(file) => {
+                let mut f = BufWriter::new(file);
+                Ok(f.write_all(buffer.as_bytes()))
+            }
+            FileWriter::Error(_) => {
+                Err("Fucked".to_string())
+            }
         }
     }
+}
 
-    pub fn write_buffer(self, buffer: &str) -> Result<std::io::Result<()>,FileWriter> {
-        if let FileWriter::Ready(file) = self{
-            let mut f = BufWriter::new(file);
-            Ok(f.write_all(buffer.as_bytes()))
-        }
-        else { Err(self) }
+pub fn new(file_name: &str) -> FileWriter {
+    let file_result = OpenOptions::new().write(true).append(true).open(file_name);
+
+    match file_result {
+        Ok(file) => FileWriter::Ready(file),
+        Err(error) => FileWriter::Error(error),
     }
 }
 
