@@ -30,6 +30,11 @@ fn roll_dice(num_dice: u16, num_sides: u8) -> RollResult{
     roll_result
 }
 
+#[derive(Debug, Clone)]
+pub struct RollRequest {
+    request_list: Vec<RequestToken>,
+}
+
 struct RollResult {
     total: u16,
     // request_token: RequestToken,
@@ -45,11 +50,6 @@ struct DiceThrowDescription {
 struct DiceThrowModifier {
     operator: ModifierOperators,
     value: u8,
-}
-
-#[derive(Debug, Clone)]
-pub struct RollRequest {
-    request_list: Vec<RequestToken>,
 }
 
 #[derive(Debug, Clone)]

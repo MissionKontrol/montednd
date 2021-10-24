@@ -20,7 +20,7 @@ fn main() -> Result<(),String> {
         let local_player_vec = player_vec.clone();
         thread_list.push(thread::spawn(move||
             {
-                battle(&local_player_vec, thread_iterations, i as u8, ReportOutputLevel::Summary)
+                battle(&local_player_vec, thread_iterations, i as u8, ReportOutputLevel::None)
             }));   
     }
  
@@ -107,16 +107,15 @@ fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_
 }
 
 fn make_battle_order_list(players: &[CharacterStruct], report_level: &ReportOutputLevel) -> BattleOrderList {
-    let mut rng = rand::thread_rng();
     let mut battle_order_list = Vec::new();
     
     for player in players {
         let initiative_die = "1d20".to_string();
-        let roll_request = dice_thrower::parse_request(&initiative_die);
-
-        let initative_roll = rng.gen_range(1..=20);
+        let roll_request = dice_thrower::parse_request(&initiative_die).unwrap();
+        let initative_roll = dice_thrower::throw_roll(&roll_request);
+        
         let order = BattleOrder {
-            initative_roll,
+            initative_roll: initative_roll as u8,
             character: player.clone(),
             team: player.team,
         };
