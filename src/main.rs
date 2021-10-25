@@ -10,8 +10,8 @@ mod file_writer;
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    let desired_iterations: u32 = 5_000;
-    let threads_desired: u8 = 1;
+    let desired_iterations: u32 = 5_000_000;
+    let threads_desired: u8 = 5;
     let thread_iterations = desired_iterations/u32::from(threads_desired);
 
     let mut battle_collection_list:Vec<BattleResultCollection> = Vec::with_capacity(6);
@@ -33,7 +33,7 @@ fn main() -> Result<(),String> {
     match summary_writer {
         file_writer::FileWriter::Ready(_) => {
             for battle in &battle_collection_list {
-                let mut buffer: String;
+                let buffer: String;
                 let collection = battle.summarize().unwrap();
                 buffer = format!("{}",collection);
                 summary_writer.write_buffer(&buffer);
@@ -42,20 +42,18 @@ fn main() -> Result<(),String> {
         file_writer::FileWriter::Error(error) => println!("{}", error),
     };
         
-
-    // for battle in &battle_collection_list {
-    //     let collection = battle.summarize().expect("something");
-    //             println!("Battle Summary: ");
-    //             println!("{}", collection.battle_count );
-    //             println!("{}", collection);
-    //     }
-
-    // for battle in &battle_collection_list {
-    //     let collection = battle.accumulate_summary().expect("accumulator says not");
-    //             println!("Battle Accumlation: ");
-    //             println!("{}", collection.number_of_battles);
-    //             println!("{}", collection)
-    // }
+    let accumulation_writer = file_writer::new("./output/acc.txt");
+    match accumulation_writer {
+        file_writer::FileWriter::Ready(_) => {
+            for battle in &battle_collection_list {
+                let buffer: String;
+                let accumulation = battle.accumulate_summary().unwrap();
+                buffer = format!("{}", accumulation);
+                accumulation_writer.write_buffer(&buffer);
+            }
+        }
+        file_writer::FileWriter::Error(error) => println!("{}", error),
+    };
 
     Ok(())
 }
@@ -113,7 +111,7 @@ fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_
     for battle_num in 0..battle_count {
         let mut battle_result = battle_order_list.clone().run_battle(battle_num, &report_level);
         battle_result.battle_id = format!("{}{:0>6}", arena_id, battle_num);        // sus
-        battle_result.initiative_winner = initiative_winner.character.name.clone();
+        battle_result.initiative_winner = initiative_winner.team.to_string();
         battle_result_collection.battle_result_list.push(battle_result.clone());
     }
 
@@ -231,6 +229,15 @@ impl CharacterStruct {
 enum Team {
     Heros,
     Villains,
+}
+
+impl fmt::Display for Team {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Team::Heros => write!(f,"Heros"),
+            Team::Villains => write!(f,"Villans"),
+        }
+    }
 }
 
 impl Default for Team {
@@ -357,7 +364,7 @@ struct BattleOrderList {
 impl BattleOrderList{
     fn run_battle(mut self, battle_num: u32, report_level: &ReportOutputLevel) -> BattleResult {
         let mut winning_result = false;
-        let mut turn_count: u8 = 0;
+        let mut turn_count: u8 = 1;
         let mut turn_result: TurnResult = Default::default();
         let turn_result_ref = &mut turn_result;
         let mut battle_result = BattleResult {
@@ -476,7 +483,7 @@ impl BattleOrderList{
         None
     }
 
-    fn get_initiative_winner(&self) -> CharacterStruct {
+    fn _get_initiative_winner(&self) -> CharacterStruct {
         self.battle_order_list[0].character.clone()
     }
 }
@@ -519,6 +526,8 @@ trait Summary <T, B> {
     fn accumulate_summary(&self) -> Option<B>;
 }
 
+
+
 #[derive(Default)]
 struct BattleResultCollection {
     arena_id: u8,
@@ -532,12 +541,12 @@ struct CollectionSummary {
     battle_count: u32,
     total_turns_run: u32,
     average_turns_run: u16,
-    _max_turns_run: u8,    
+    max_turns_run: u8,    
 }
 
 impl fmt::Display for CollectionSummary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{},{},{},{},{}", self.arena_id, self.battle_count, self.total_turns_run, self.average_turns_run, self._max_turns_run)
+        write!(f, "{},{},{},{},{}", self.arena_id, self.battle_count, self.total_turns_run, self.average_turns_run, self.max_turns_run)
     }
 }
 
@@ -566,7 +575,7 @@ impl Summary<CollectionSummary, CollectionAccumulation> for BattleResultCollecti
             battle_count: self.battle_count,
             total_turns_run,
             average_turns_run: (total_turns_run /self.battle_count) as u16,
-            _max_turns_run: self.battle_result_list.iter().fold(0_u8, |max, battle_result| if max > battle_result.turn_result.len() as u8 { max }
+            max_turns_run: self.battle_result_list.iter().fold(0_u8, |max, battle_result| if max > battle_result.turn_result.len() as u8 { max }
                 else { battle_result.turn_result.len() as u8 }),    
         };
         Some(battle_collection_summary)
@@ -582,10 +591,10 @@ impl Summary<CollectionSummary, CollectionAccumulation> for BattleResultCollecti
 
             if let Some(battle_summary) = res {
                 let winner = if battle_summary.winner == battle_summary.initiative_winner { 
-                    format!("{:?}*", battle_summary.winning_team)
+                    format!("{}*", battle_summary.winning_team)
                 }
-                else { format!("{:?}", battle_summary.winning_team) };
-                *accumulation.entry((battle.turns_run as u16,winner)).or_insert(0) += 1;
+                else { format!("{}", battle_summary.winning_team) };
+                    *accumulation.entry((battle.turns_run as u16,winner)).or_insert(0) += 1;
             }
         }
         let battle_collection_accumulation = CollectionAccumulation{
@@ -628,7 +637,7 @@ impl Summary<BattleSummary, BattleAccumulator> for BattleResult {
         let battle_summary = BattleSummary {
             battle_id: self.battle_id.clone(), 
             turns_run: self.turns_run as u8, 
-            winner: self.winner.name.clone(),
+            winner: self.winner.team.to_string(),
             initiative_winner: self.initiative_winner.clone(),
             winning_team: self.winner.team,
         };
