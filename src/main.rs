@@ -34,7 +34,7 @@ fn main() -> Result<(),String> {
         file_writer::FileWriter::Ready(_) => {
             for battle in &battle_collection_list {
                 let buffer: String;
-                let collection = battle.summarize().unwrap();
+                let collection: CollectionSummary = battle.summarize().unwrap();
                 buffer = format!("{}",collection);
                 summary_writer.write_buffer(&buffer);
             }
@@ -317,9 +317,6 @@ struct TurnResultSummary {
     _number_of_hits: u8,
 }
 
-struct TurnResultAccumulator {
-}
-
 impl Summary<TurnResultSummary> for TurnResult {
     fn summarize(&self) -> Option<TurnResultSummary>{
         todo!("can I wrote here?");
@@ -525,11 +522,6 @@ trait Accumulate<T> {
     fn accumulate_summary(&self) -> Option<T>;
 }
 
-struct SummarziedData {
-    title: String,
-    summary: String,
-}
-
 #[derive(Default)]
 struct BattleResultCollection {
     arena_id: u8,
@@ -569,7 +561,7 @@ impl fmt::Display for CollectionAccumulation {
 }
 
 impl Summary<CollectionSummary> for BattleResultCollection {
-    fn summarize(&self ) -> Option<CollectionSummary> {
+    fn summarize(&self) -> Option<CollectionSummary> {
         let total_turns_run: u32 = self.battle_result_list.iter()
             .fold(0_u32, |acc, battle_result| acc + battle_result.turns_run as u32);
         let battle_collection_summary = CollectionSummary {
@@ -631,10 +623,6 @@ impl fmt::Display for BattleSummary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{},{},{},{:?}", self.battle_id, self.turns_run, self.initiative_winner, self.winning_team)
     }
-}
-
-struct BattleAccumulator {
-
 }
 
 impl Summary<BattleSummary> for BattleResult {
