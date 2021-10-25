@@ -320,13 +320,9 @@ struct TurnResultSummary {
 struct TurnResultAccumulator {
 }
 
-impl Summary<TurnResultSummary, TurnResultAccumulator> for TurnResult {
+impl Summary<TurnResultSummary> for TurnResult {
     fn summarize(&self) -> Option<TurnResultSummary>{
         todo!("can I wrote here?");
-    }
-    
-    fn accumulate_summary(&self) -> Option<TurnResultAccumulator> {
-        todo!();
     }
 }
 
@@ -521,12 +517,18 @@ impl BattleOrder {
     
 }
 
-trait Summary <T, B> {
+trait Summary <T> {
     fn summarize(&self) -> Option<T>;
-    fn accumulate_summary(&self) -> Option<B>;
 }
 
+trait Accumulate<T> {
+    fn accumulate_summary(&self) -> Option<T>;
+}
 
+struct SummarziedData {
+    title: String,
+    summary: String,
+}
 
 #[derive(Default)]
 struct BattleResultCollection {
@@ -566,7 +568,7 @@ impl fmt::Display for CollectionAccumulation {
     }    
 }
 
-impl Summary<CollectionSummary, CollectionAccumulation> for BattleResultCollection {
+impl Summary<CollectionSummary> for BattleResultCollection {
     fn summarize(&self ) -> Option<CollectionSummary> {
         let total_turns_run: u32 = self.battle_result_list.iter()
             .fold(0_u32, |acc, battle_result| acc + battle_result.turns_run as u32);
@@ -580,6 +582,9 @@ impl Summary<CollectionSummary, CollectionAccumulation> for BattleResultCollecti
         };
         Some(battle_collection_summary)
     }
+}
+
+impl Accumulate<CollectionAccumulation> for BattleResultCollection {
 
     fn accumulate_summary(&self) -> Option<CollectionAccumulation>{
         let mut number_of_battles: u32 = 0;
@@ -632,7 +637,7 @@ struct BattleAccumulator {
 
 }
 
-impl Summary<BattleSummary, BattleAccumulator> for BattleResult {
+impl Summary<BattleSummary> for BattleResult {
     fn summarize(&self) -> Option<BattleSummary> {
         let battle_summary = BattleSummary {
             battle_id: self.battle_id.clone(), 
@@ -643,11 +648,8 @@ impl Summary<BattleSummary, BattleAccumulator> for BattleResult {
         };
         Some(battle_summary)
     }
-
-    fn accumulate_summary(&self) -> Option<BattleAccumulator>{
-        todo!()
-    }
 }
+
 
 #[test]
 fn test_make_battle_order_list() {
