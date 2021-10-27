@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{error, fmt};
 use std::{io::Error, thread};
 use rand::Rng;
 use std::collections::HashMap;
@@ -10,13 +10,11 @@ mod file_writer;
 
 const BATTLE_COLLECTION_SUMMARY_FILE: &str = "./output/bc_summary.out";
 const BATTLE_COLLECTION_ACCUMULATION_FILE: &str = "./output/bc_accumulation.out";
-const BATTLE_RESULT_SUMMARY_FILE: &str = "./output/bc_summary.out";
-const BATTLE_RESULT_ACCUMULATION_FILE: &str = "./output/bc_accumulation.out";
 
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    const DESIRED_ITERATIONS: u32 = 5_000_000;
+    const DESIRED_ITERATIONS: u32 = 1_000_000;
     const THREADS_DESIRED: u8 = 5;
     let thread_iterations = DESIRED_ITERATIONS/u32::from(THREADS_DESIRED);
 
@@ -34,16 +32,6 @@ fn main() -> Result<(),String> {
     for thread_counter in thread_list {
         battle_collection_list.push(thread_counter.join().unwrap());
     }
-
-    // for battle in &battle_collection_list {
-    //     let buffer: String;
-    //     let collection: CollectionSummary = battle.summarize().unwrap();
-    //     buffer = format!("{}",collection);
-    //     match write_to_file(&buffer, SUMMARY_FILE){
-    //         Ok(_) => continue,
-    //         Err(error) => handle_file_error(error),
-    //     };
-    // };
     
     Ok(())
 }
@@ -115,6 +103,7 @@ fn get_players() -> Vec<CharacterStruct> {
 }
 
 fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_level: ReportOutputLevel) -> String {
+    const DUMP_INCREMENT: u32 = 10_000;
     let battle_order_list = make_battle_order_list(players, &report_level);
     let mut battle_result_collection = BattleResultCollection {
         battle_order_list: battle_order_list.battle_order_list.clone(),
@@ -125,26 +114,34 @@ fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_
 
     let initiative_winner = &battle_order_list.battle_order_list.iter().max_by_key(|p| p.initative_roll).expect("duff list");
     battle_result_collection.battle_order_list = battle_order_list.battle_order_list.clone();
+    let mut dump_counter = DUMP_INCREMENT;
 
     for battle_num in 0..battle_count {
         let mut battle_result = battle_order_list.clone().run_battle(battle_num, &report_level);
         battle_result.battle_id = format!("{}{:0>6}", arena_id, battle_num);        // sus
         battle_result.initiative_winner = initiative_winner.team.to_string();
         battle_result_collection.battle_result_list.push(battle_result.clone());
+
+        if battle_num > dump_counter {        
+            dump_counter += DUMP_INCREMENT;
+            let buffer: String;
+            let summary = battle_result_collection.summarize().unwrap();
+            buffer = format!("{}",summary);
+            if let std::result::Result::Err(error) = write_to_file(&buffer, BATTLE_COLLECTION_SUMMARY_FILE) {
+                handle_file_error(error);
+            }
+
+            let buffer: String;
+            let summary = battle_result_collection.accumulate_summary().unwrap();
+            buffer = format!("{}",summary);
+            if let std::result::Result::Err(error) = write_to_file(&buffer, BATTLE_COLLECTION_ACCUMULATION_FILE){
+                handle_file_error(error);
+            }
+            battle_result_collection.battle_result_list.clear();
+        }
     }
 
-    // for battle in &battle_result_collection{
-        let buffer: String;
-        let summary = battle_result_collection.summarize().unwrap();
-        buffer = format!("{}",summary);
-        write_to_file(&buffer, BATTLE_COLLECTION_SUMMARY_FILE);
-
-        let buffer: String;
-        let summary = battle_result_collection.accumulate_summary().unwrap();
-        buffer = format!("{}",summary);
-        write_to_file(&buffer, BATTLE_COLLECTION_ACCUMULATION_FILE);
-    // }
-
+    
     String::from("Okay")
 }
 
@@ -176,7 +173,6 @@ fn make_battle_order_list(players: &[CharacterStruct], report_level: &ReportOutp
             report_level: ReportOutputLevel::None },
     }
 }
-
 
 #[derive(Clone, Copy, Debug)]
 enum ReportOutputLevel {
@@ -345,12 +341,13 @@ struct TurnResult {
 struct TurnResultSummary {
     _action_count: u8,
     _number_of_hits: u8,
+    _damage_done: u8,
 }
 
 impl Summary<TurnResultSummary> for TurnResult {
     fn summarize(&self) -> Option<TurnResultSummary>{
-        let action_count: u8 = self.action_results.len() as u8;
-        let number_of_hits = self.action_results.iter().fold(
+        let _action_count: u8 = self.action_results.len() as u8;
+        let _number_of_hits = self.action_results.iter().fold(
             0, |i, action| 
             match action.action_result {
                 ActionResultType::Hit => i + 1,
@@ -358,9 +355,13 @@ impl Summary<TurnResultSummary> for TurnResult {
                 _ => i,
             }
         );
+        let _damage_done: u8 = self.action_results.iter().fold(
+            0, |i: u8, action| 
+            i + action.action_damage as u8);
         Some(TurnResultSummary {
-            _action_count: action_count,
-            _number_of_hits: number_of_hits,
+            _action_count,
+            _number_of_hits,
+            _damage_done,
         })
     }
 }
@@ -406,7 +407,7 @@ struct BattleOrderList {
     report_level: ReportOutputLevel,
 }
 
-impl BattleOrderList{
+impl BattleOrderList {
     fn run_battle(mut self, battle_num: u32, report_level: &ReportOutputLevel) -> BattleResult {
         let mut winning_result = false;
         let mut turn_count: u8 = 1;
