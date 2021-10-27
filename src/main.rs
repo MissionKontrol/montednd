@@ -8,15 +8,20 @@ use crate::file_writer::FileWriter;
 mod dice_thrower;
 mod file_writer;
 
+const BATTLE_COLLECTION_SUMMARY_FILE: &str = "./output/bc_summary.out";
+const BATTLE_COLLECTION_ACCUMULATION_FILE: &str = "./output/bc_accumulation.out";
+const BATTLE_RESULT_SUMMARY_FILE: &str = "./output/bc_summary.out";
+const BATTLE_RESULT_ACCUMULATION_FILE: &str = "./output/bc_accumulation.out";
+
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    const DESIRED_ITERATIONS: u32 = 5_000;
+    const DESIRED_ITERATIONS: u32 = 5_000_000;
     const THREADS_DESIRED: u8 = 5;
     let thread_iterations = DESIRED_ITERATIONS/u32::from(THREADS_DESIRED);
 
-    let mut battle_collection_list:Vec<BattleResultCollection> = Vec::with_capacity(6);
-    let mut thread_list: Vec<thread::JoinHandle<BattleResultCollection>> = Vec::with_capacity(6);
+    let mut battle_collection_list:Vec<String> = Vec::with_capacity(6);
+    let mut thread_list: Vec<thread::JoinHandle<String>> = Vec::with_capacity(6);
 
     for i in 0..THREADS_DESIRED as usize{
         let local_player_vec = player_vec.clone();
@@ -30,41 +35,33 @@ fn main() -> Result<(),String> {
         battle_collection_list.push(thread_counter.join().unwrap());
     }
 
-    let summary_writer = file_writer::new("./output/foo.txt");
-    match summary_writer {
-         FileWriter::Ready(file) => 
-            for battle in &battle_collection_list {
-                let buffer: String;
-                let collection: CollectionSummary = battle.summarize().unwrap();
-                buffer = format!("{}",collection);
-                match file.write_buffer(&buffer){
-                    Ok(_) => continue,
-                    Err(error) => handle_file_error(error),
-                }
-            }
-        FileWriter::Error(error) => handle_file_error(error),
-    }
-        
-    let accumulation_writer = file_writer::new("./output/acc.txt");
-    match accumulation_writer {
-        FileWriter::Ready(file) => {
-            for battle in &battle_collection_list {
-                let buffer: String;
-                let accumulation = battle.accumulate_summary().unwrap();
-                buffer = format!("{}", accumulation);
-                match file.write_buffer(&buffer){
-                    Ok(_) => continue,
-                    Err(error) => handle_file_error(error),
-                }
-            }
-        }
-        file_writer::FileWriter::Error(error) => handle_file_error(error),
-    };
-
+    // for battle in &battle_collection_list {
+    //     let buffer: String;
+    //     let collection: CollectionSummary = battle.summarize().unwrap();
+    //     buffer = format!("{}",collection);
+    //     match write_to_file(&buffer, SUMMARY_FILE){
+    //         Ok(_) => continue,
+    //         Err(error) => handle_file_error(error),
+    //     };
+    // };
+    
     Ok(())
 }
 
-fn handle_file_error(error: Error ){
+fn write_to_file(buffer: &str, file_name: &str) -> Result<String,std::io::Error> {
+    let writer = file_writer::new(file_name);
+
+    match writer {
+        FileWriter::Ready(file) => 
+            match file.write_buffer(&buffer){
+                    Ok(_) => Ok(String::from("Okay")),
+                    Err(error) => Err(handle_file_error(error)),
+                },
+        FileWriter::Error(error) => Err(handle_file_error(error)),
+    }
+}
+
+fn handle_file_error(error: Error ) -> Error {
     panic!("{}",error);
 }
 
@@ -102,11 +99,22 @@ fn get_players() -> Vec<CharacterStruct> {
         hs2: HealthState::Alive(6),
     };
 
-    let player_vec = vec!(player1,player2,player3);
+    let player4 = CharacterStruct {
+        name: String::from("Hero-B"),
+        armour_class: 14,
+        to_hit: 20,
+        weapon: "1d4",
+        actions_per_round: 1,
+        damage: 4,  
+        team: Team::Heros,
+        hs2: HealthState::Alive(7),
+    };
+
+    let player_vec = vec!(player1,player2,player3,player4);
     player_vec
 }
 
-fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_level: ReportOutputLevel) -> BattleResultCollection {
+fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_level: ReportOutputLevel) -> String {
     let battle_order_list = make_battle_order_list(players, &report_level);
     let mut battle_result_collection = BattleResultCollection {
         battle_order_list: battle_order_list.battle_order_list.clone(),
@@ -125,7 +133,19 @@ fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_
         battle_result_collection.battle_result_list.push(battle_result.clone());
     }
 
-    battle_result_collection
+    // for battle in &battle_result_collection{
+        let buffer: String;
+        let summary = battle_result_collection.summarize().unwrap();
+        buffer = format!("{}",summary);
+        write_to_file(&buffer, BATTLE_COLLECTION_SUMMARY_FILE);
+
+        let buffer: String;
+        let summary = battle_result_collection.accumulate_summary().unwrap();
+        buffer = format!("{}",summary);
+        write_to_file(&buffer, BATTLE_COLLECTION_ACCUMULATION_FILE);
+    // }
+
+    String::from("Okay")
 }
 
 fn make_battle_order_list(players: &[CharacterStruct], report_level: &ReportOutputLevel) -> BattleOrderList {
@@ -323,13 +343,13 @@ struct TurnResult {
 }
 
 struct TurnResultSummary {
-    action_count: u8,
-    number_of_hits: u8,
+    _action_count: u8,
+    _number_of_hits: u8,
 }
 
 impl Summary<TurnResultSummary> for TurnResult {
     fn summarize(&self) -> Option<TurnResultSummary>{
-        let action_count: usize = self.action_results.len();
+        let action_count: u8 = self.action_results.len() as u8;
         let number_of_hits = self.action_results.iter().fold(
             0, |i, action| 
             match action.action_result {
@@ -339,9 +359,19 @@ impl Summary<TurnResultSummary> for TurnResult {
             }
         );
         Some(TurnResultSummary {
-            action_count: action_count as u8,
-            number_of_hits,
+            _action_count: action_count,
+            _number_of_hits: number_of_hits,
         })
+    }
+}
+
+struct TurnAccumulation {
+
+}
+
+impl Accumulate<TurnAccumulation> for TurnResult {
+    fn accumulate_summary(&self) -> Option<TurnAccumulation> {
+        todo!()
     }
 }
 
