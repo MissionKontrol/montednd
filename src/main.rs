@@ -4,13 +4,15 @@ use std::thread;
 use rand::Rng;
 use std::collections::HashMap;
 
+use crate::file_writer::FileWriter;
+
 mod dice_thrower;
 mod file_writer;
 
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    let desired_iterations: u32 = 5_000_000;
+    let desired_iterations: u32 = 5_000;
     let threads_desired: u8 = 5;
     let thread_iterations = desired_iterations/u32::from(threads_desired);
 
@@ -31,25 +33,24 @@ fn main() -> Result<(),String> {
 
     let summary_writer = file_writer::new("./output/foo.txt");
     match summary_writer {
-        file_writer::FileWriter::Ready(_) => {
+         FileWriter::Ready(file) => 
             for battle in &battle_collection_list {
                 let buffer: String;
                 let collection: CollectionSummary = battle.summarize().unwrap();
                 buffer = format!("{}",collection);
-                summary_writer.write_buffer(&buffer);
+                file.write_buffer(&buffer);
             }
-        }
-        file_writer::FileWriter::Error(error) => println!("{}", error),
-    };
+        FileWriter::Error(error) => panic!("{}", error),
+    }
         
     let accumulation_writer = file_writer::new("./output/acc.txt");
     match accumulation_writer {
-        file_writer::FileWriter::Ready(_) => {
+        FileWriter::Ready(file) => {
             for battle in &battle_collection_list {
                 let buffer: String;
                 let accumulation = battle.accumulate_summary().unwrap();
                 buffer = format!("{}", accumulation);
-                accumulation_writer.write_buffer(&buffer);
+                file.write_buffer(&buffer);
             }
         }
         file_writer::FileWriter::Error(error) => println!("{}", error),
