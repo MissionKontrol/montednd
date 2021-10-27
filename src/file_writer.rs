@@ -1,5 +1,5 @@
-use std::io::{BufWriter, Write, Error};
-use std::io;
+use std::io::{BufWriter, Write};
+use std::{io};
 use std::fs::OpenOptions;
 
 pub enum FileWriter {
@@ -14,7 +14,7 @@ pub struct FileWriterHandle {
 impl FileWriterHandle {
     pub fn write_buffer(&self, buffer: &str) -> io::Result<()> {
         let mut f = BufWriter::new(&self.file);
-        match f.write_all(format!("{}\n", buffer).as_bytes()) {
+        match Write::write_all(&mut f, format!("{}\n", buffer).as_bytes()) {
             Err(error) => Err(error),
             Ok(_) => Ok(()),
         }

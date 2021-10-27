@@ -1,6 +1,5 @@
 use std::fmt;
-use std::thread;
-// use std::fmt::Write;
+use std::{io::Error, thread};
 use rand::Rng;
 use std::collections::HashMap;
 
@@ -12,14 +11,14 @@ mod file_writer;
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    let desired_iterations: u32 = 5_000;
-    let threads_desired: u8 = 5;
-    let thread_iterations = desired_iterations/u32::from(threads_desired);
+    const DESIRED_ITERATIONS: u32 = 5_000;
+    const THREADS_DESIRED: u8 = 5;
+    let thread_iterations = DESIRED_ITERATIONS/u32::from(THREADS_DESIRED);
 
     let mut battle_collection_list:Vec<BattleResultCollection> = Vec::with_capacity(6);
-    let mut thread_list: Vec<thread::JoinHandle<_>> = Vec::with_capacity(6);
+    let mut thread_list: Vec<thread::JoinHandle<BattleResultCollection>> = Vec::with_capacity(6);
 
-    for i in 0..threads_desired as usize{
+    for i in 0..THREADS_DESIRED as usize{
         let local_player_vec = player_vec.clone();
         thread_list.push(thread::spawn(move||
             {
@@ -38,9 +37,12 @@ fn main() -> Result<(),String> {
                 let buffer: String;
                 let collection: CollectionSummary = battle.summarize().unwrap();
                 buffer = format!("{}",collection);
-                file.write_buffer(&buffer);
+                match file.write_buffer(&buffer){
+                    Ok(_) => continue,
+                    Err(error) => handle_file_error(error),
+                }
             }
-        FileWriter::Error(error) => panic!("{}", error),
+        FileWriter::Error(error) => handle_file_error(error),
     }
         
     let accumulation_writer = file_writer::new("./output/acc.txt");
@@ -50,13 +52,20 @@ fn main() -> Result<(),String> {
                 let buffer: String;
                 let accumulation = battle.accumulate_summary().unwrap();
                 buffer = format!("{}", accumulation);
-                file.write_buffer(&buffer);
+                match file.write_buffer(&buffer){
+                    Ok(_) => continue,
+                    Err(error) => handle_file_error(error),
+                }
             }
         }
-        file_writer::FileWriter::Error(error) => println!("{}", error),
+        file_writer::FileWriter::Error(error) => handle_file_error(error),
     };
 
     Ok(())
+}
+
+fn handle_file_error(error: Error ){
+    panic!("{}",error);
 }
 
 fn get_players() -> Vec<CharacterStruct> {
