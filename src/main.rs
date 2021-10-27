@@ -323,13 +323,25 @@ struct TurnResult {
 }
 
 struct TurnResultSummary {
-    _action_count: u8,
-    _number_of_hits: u8,
+    action_count: u8,
+    number_of_hits: u8,
 }
 
 impl Summary<TurnResultSummary> for TurnResult {
     fn summarize(&self) -> Option<TurnResultSummary>{
-        todo!("can I wrote here?");
+        let action_count: usize = self.action_results.len();
+        let number_of_hits = self.action_results.iter().fold(
+            0, |i, action| 
+            match action.action_result {
+                ActionResultType::Hit => i + 1,
+                ActionResultType::_CritHit => i + 1,
+                _ => i,
+            }
+        );
+        Some(TurnResultSummary {
+            action_count: action_count as u8,
+            number_of_hits,
+        })
     }
 }
 
