@@ -2,7 +2,7 @@ use std::{fmt};
 use std::{io::Error, thread};
 use rand::Rng;
 use std::collections::HashMap;
-use std::sync::mpsc::{Sender, channel};
+use std::sync::mpsc::{SendError, Sender, channel};
 
 use crate::file_writer::FileWriter;
 
@@ -16,17 +16,20 @@ fn main() -> Result<(),String> {
     let player_vec = get_players();
 
     const DESIRED_ITERATIONS: u32 = 10_000_000;
-    const THREADS_DESIRED: u8 = 5;
+    const THREADS_DESIRED: u8 = 10;
     let thread_iterations = DESIRED_ITERATIONS/u32::from(THREADS_DESIRED);
 
-    let mut battle_collection_list:Vec<Result<String,Error>> = Vec::with_capacity(6);
-    let mut thread_list: Vec<thread::JoinHandle<Result<String,Error>>> = Vec::with_capacity(6);
+    let mut battle_collection_list:Vec<Result<String,SendError<SendBuffer>>> = Vec::with_capacity(6);
+    let mut thread_list: Vec<thread::JoinHandle<Result<String,SendError<SendBuffer>>>> = Vec::with_capacity(6);
     let (sender,receiver) = channel();
 
     thread::spawn(move || {
         loop {
-            let buffer: String = receiver.recv().unwrap();
-            write_to_file(&buffer, BATTLE_COLLECTION_ACCUMULATION_FILE);
+            let rx: SendBuffer = receiver.recv().unwrap();
+            match write_to_file(&rx.buffer , &rx.file_name) {
+                Err(error) => println!("Received Write Thread error: {}", error),
+                Ok(_) => continue,
+            }
         }
     });
 
@@ -112,7 +115,7 @@ fn get_players() -> Vec<CharacterStruct> {
     player_vec
 }
 
-fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_level: ReportOutputLevel, sender: Sender<String>) -> Result<String, Error> {
+fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_level: ReportOutputLevel, sender: Sender<SendBuffer>) -> Result<String, SendError<SendBuffer>> {
     const DUMP_INCREMENT: u32 = 500_000;
     let battle_order_list = make_battle_order_list(players, &report_level);
     let mut battle_result_collection = BattleResultCollection {
@@ -134,23 +137,35 @@ fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_
 
         if battle_num > dump_counter {        
             dump_counter += DUMP_INCREMENT;
-            let buffer: String;
             let summary = battle_result_collection.summarize().unwrap();
-            buffer = format!("{}",summary);
-            write_to_file(&buffer, BATTLE_COLLECTION_SUMMARY_FILE)?;
+            let send_buffer = SendBuffer {
+                buffer: format!("{}",summary),
+                file_name: BATTLE_COLLECTION_SUMMARY_FILE,                
+            };
+            write_buffer(send_buffer, &sender)?;
 
-            let buffer: String;
             let summary = battle_result_collection.accumulate_summary().unwrap();
-            buffer = format!("{}",summary);
-            // write_to_file(&buffer, BATTLE_COLLECTION_ACCUMULATION_FILE)?;
-            sender.send(buffer);
+            let send_buffer = SendBuffer {
+                buffer: format!("{}",summary),
+                file_name: BATTLE_COLLECTION_ACCUMULATION_FILE,                
+            };
+            write_buffer(send_buffer, &sender)?;
 
             battle_result_collection.battle_result_list.clear();
         }
     }
-
-    
     Ok(String::from("Okay"))
+}
+
+fn write_buffer(send_buffer: SendBuffer, sender: &Sender<SendBuffer>) -> Result<String,SendError<SendBuffer>> {
+    if let Err(error) = sender.send(send_buffer){
+        Err(error)
+    } else { Ok("grand".to_string()) } 
+}
+
+struct SendBuffer {
+    buffer: String,
+    file_name: &'static str,
 }
 
 fn make_battle_order_list(players: &[CharacterStruct], report_level: &ReportOutputLevel) -> BattleOrderList {
