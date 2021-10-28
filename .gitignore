@@ -4,3 +4,4 @@ perf.data.old
 launch.json
 out.csv
 /output
+flamegraph.svg

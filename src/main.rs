@@ -122,13 +122,13 @@ fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_
         ..Default::default()
     };
 
-    let initiative_winner = &battle_order_list.battle_order_list.iter().max_by_key(|p| p.initative_roll).expect("duff list");
+    let initiative_winner = &battle_order_list.battle_order_list.iter().max_by_key(|p| p.initative_roll).unwrap();
     battle_result_collection.battle_order_list = battle_order_list.battle_order_list.clone();
     let mut dump_counter = DUMP_INCREMENT;
 
     for battle_num in 0..battle_count {
         let mut battle_result = battle_order_list.clone().run_battle(battle_num, &report_level);
-        battle_result.battle_id = format!("{}{:0>6}", arena_id, battle_num);        // sus
+        battle_result.battle_id = format!("{}{:0>6}", arena_id, battle_num);        
         battle_result.initiative_winner = initiative_winner.team.to_string();
         battle_result_collection.battle_result_list.push(battle_result.clone());
 
