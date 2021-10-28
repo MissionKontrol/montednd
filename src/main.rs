@@ -14,7 +14,7 @@ const BATTLE_COLLECTION_ACCUMULATION_FILE: &str = "./output/bc_accumulation.out"
 fn main() -> Result<(),String> {
     let player_vec = get_players();
 
-    const DESIRED_ITERATIONS: u32 = 1_000_000;
+    const DESIRED_ITERATIONS: u32 = 10_000_000;
     const THREADS_DESIRED: u8 = 5;
     let thread_iterations = DESIRED_ITERATIONS/u32::from(THREADS_DESIRED);
 
@@ -87,23 +87,23 @@ fn get_players() -> Vec<CharacterStruct> {
         hs2: HealthState::Alive(6),
     };
 
-    let player4 = CharacterStruct {
-        name: String::from("Hero-B"),
-        armour_class: 14,
-        to_hit: 20,
-        weapon: "1d4",
-        actions_per_round: 1,
-        damage: 4,  
-        team: Team::Heros,
-        hs2: HealthState::Alive(7),
-    };
+    // let player4 = CharacterStruct {
+    //     name: String::from("Hero-B"),
+    //     armour_class: 14,
+    //     to_hit: 20,
+    //     weapon: "1d4",
+    //     actions_per_round: 1,
+    //     damage: 4,  
+    //     team: Team::Heros,
+    //     hs2: HealthState::Alive(7),
+    // };
 
-    let player_vec = vec!(player1,player2,player3,player4);
+    let player_vec = vec!(player1,player2,player3);
     player_vec
 }
 
 fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_level: ReportOutputLevel) -> String {
-    const DUMP_INCREMENT: u32 = 10_000;
+    const DUMP_INCREMENT: u32 = 500_000;
     let battle_order_list = make_battle_order_list(players, &report_level);
     let mut battle_result_collection = BattleResultCollection {
         battle_order_list: battle_order_list.battle_order_list.clone(),
@@ -606,7 +606,7 @@ impl fmt::Display for CollectionAccumulation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut output = String::new();
         for row in self.accumulation.clone() {
-            let write_row = format!("{:?} {}\n", row.0, row.1);
+            let write_row = format!("{:?},{}\n", row.0, row.1);
             output.push_str(&write_row);
         }
         write!(f, "{}", output)
