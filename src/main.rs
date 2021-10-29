@@ -8,26 +8,35 @@ use crate::file_writer::FileWriter;
 
 mod dice_thrower;
 mod file_writer;
+mod characterize;
 
 const BATTLE_COLLECTION_SUMMARY_FILE: &str = "./output/bc_summary.out";
 const BATTLE_COLLECTION_ACCUMULATION_FILE: &str = "./output/bc_accumulation.out";
 const DESIRED_ITERATIONS: u32 = 10_000_000;
-const THREADS_DESIRED: u32 = 10;
+const THREADS_DESIRED: u32 = 1000;
 const THREAD_ITERATIONS: u32 = DESIRED_ITERATIONS/THREADS_DESIRED;
-const WRITE_TO_FILE_TRIGGER: u32 = THREAD_ITERATIONS / 20;
+const WRITE_TO_FILE_TRIGGER: u32 = THREAD_ITERATIONS / 10;
 
 fn main() -> Result<(),String> {
     let player_vec = get_players();
     let mut thread_list: Vec<thread::JoinHandle<()>> = Vec::with_capacity(6);
-    let (sender,receiver) = channel();
+    let (sender, receiver):(Sender<SendBuffer>, std::sync::mpsc::Receiver<_>) = channel();
 
     let _writer_thread = thread::Builder::new().name("Writer".to_string()).spawn(move || {
         loop {
-            let rx: SendBuffer = receiver.recv().unwrap();
-            match write_to_file(&rx.buffer , &rx.file_name) {
-                Err(error) => println!("Received Write Thread error: {}", error),
-                Ok(_) => continue,
+            let rx_res = receiver.recv();
+            match rx_res {
+                Ok(foo) => {
+                    let res= write_to_file(&foo.buffer , &foo.file_name);
+                    match res {
+                        Err(error) => println!("Received Write Thread error: {}", error),
+                        Ok(_) => continue,
+                    };
+                }
+                Err(error) => println!("Writer Thread: {}", error),
             }
+
+           
         }
     });
 
@@ -223,7 +232,7 @@ struct CharacterStruct {
     // hit_points: u8,
     armour_class: u8,
     to_hit: u8,
-    weapon: &'static str,
+    weapon: String,
     actions_per_round: u8,
     damage: u8,
     team: Team,
@@ -355,7 +364,7 @@ enum ActionType {
 
 struct AttackResult {
     attack_roll: u8,
-    _roll_string: &'static str,
+    _roll_string: String,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -805,11 +814,11 @@ fn is_attack_successful() {
     let players = get_players();
     let successful_attack = AttackResult {
         attack_roll: 20,
-        _roll_string: "1d12",
+        _roll_string: "1d12".to_string(),
     };
     let failure_attack = AttackResult {
         attack_roll: 1,
-        _roll_string: "1d12",
+        _roll_string: "1d12".to_string(),
     };
 
     assert_eq!(players[0].is_attack_successful(&successful_attack),true);
