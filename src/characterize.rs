@@ -1,18 +1,18 @@
 use serde::{Deserialize};
-use serde_json::Error;
 use std::fs;
 use std::{fmt};
+// use std::fs::File;
+use std::io::{Error as IOError};
 
-fn main() {
-    let contents: String = fs::read_to_string("./input/temp.json")
-        .expect("Something went wrong reading the file");
+pub fn load_players(file: &str) -> Result<Vec<CharacterStruct>,IOError> {
+    let contents = read_file(file)?;
+    let deserial: Vec<CharacterStruct> = serde_json::from_str(&contents)?;
+    Ok(deserial)
+}
 
-    let foo = &contents;
-    let deserialized: Result<CharacterStruct,Error> = serde_json::from_str(foo);
-    if let Err(error) = deserialized {
-        println!("ERROR: {}", error);
-    }
-    else {println!("deserialized = {:?}", deserialized);} 
+fn read_file(file: &str) -> Result<String,std::io::Error>{
+    let contents = fs::read_to_string(file)?;
+    Ok(contents)
 }
 
 pub fn get_players() -> Vec<CharacterStruct> {

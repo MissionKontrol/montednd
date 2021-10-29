@@ -9,17 +9,18 @@ use crate::file_writer::FileWriter;
 mod dice_thrower;
 mod file_writer;
 mod characterize;
-use characterize::{HealthState, Team, CharacterStruct, get_players};
+use characterize::{CharacterStruct, HealthState, Team, load_players};
 
 const BATTLE_COLLECTION_SUMMARY_FILE: &str = "./output/bc_summary.out";
 const BATTLE_COLLECTION_ACCUMULATION_FILE: &str = "./output/bc_accumulation.out";
-const DESIRED_ITERATIONS: u32 = 10_000_000;
-const THREADS_DESIRED: u32 = 1000;
+const DESIRED_ITERATIONS: u32 = 10_000;
+const THREADS_DESIRED: u32 = 10;
 const THREAD_ITERATIONS: u32 = DESIRED_ITERATIONS/THREADS_DESIRED;
 const WRITE_TO_FILE_TRIGGER: u32 = THREAD_ITERATIONS / 10;
 
 fn main() -> Result<(),String> {
-    let player_vec= get_players();
+    let player_vec= load_players("./input/temp.json").expect("Main");
+
     let mut thread_list: Vec<thread::JoinHandle<()>> = Vec::with_capacity(6);
     let (sender, receiver):(Sender<SendBuffer>, std::sync::mpsc::Receiver<_>) = channel();
 
@@ -36,13 +37,11 @@ fn main() -> Result<(),String> {
                 }
                 Err(error) => println!("Writer Thread: {}", error),
             }
-
-           
         }
     });
 
     for i in 0..THREADS_DESIRED as usize{
-        let local_player_vec = player_vec.clone();
+        let local_player_vec: Vec<CharacterStruct> = player_vec.clone();
         let sender = sender.clone();
         let name = format!("Sender-{}",i);
         let builder = thread::Builder::new().name(name);
@@ -76,7 +75,7 @@ fn write_to_file(buffer: &str, file_name: &str) -> Result<String,std::io::Error>
 }
 
 fn handle_file_error(error: Error ) -> Error {
-    println!("{}",error);
+    println!("HFE{}",error);
     error
 }
 
@@ -625,6 +624,8 @@ impl Summary<BattleSummary> for BattleResult {
 
 #[test]
 fn test_make_battle_order_list() {
+    use characterize::get_players;
+
     let players = get_players(); 
     let test_list = make_battle_order_list(&players, &ReportOutputLevel::Summary);
     assert_ne!(test_list.battle_order_list.len(),0,"no list");
@@ -632,6 +633,8 @@ fn test_make_battle_order_list() {
 
 #[test]
 fn test_order_of_make_battler_order_list() {
+    use characterize::get_players;
+
     let players = get_players();
     let test_list = make_battle_order_list(&players, &ReportOutputLevel::Summary);
     assert_eq!(test_list.battle_order_list[0].initative_roll > test_list.battle_order_list[1].initative_roll,true,"list not ordered");
@@ -639,12 +642,16 @@ fn test_order_of_make_battler_order_list() {
 
 #[test]
 fn get_players_test() {
+    use characterize::get_players;
+
     let list = get_players();
     assert_ne!(list.len(), 0, "Character get fail")
 }
 
 #[test]
 fn select_target_test() {
+    use characterize::get_players;
+
     let players = get_players();
     let test_list = make_battle_order_list(&players, &ReportOutputLevel::Summary);
     let target = test_list.battle_order_list[0].character.select_target(&test_list.battle_order_list);
@@ -658,6 +665,8 @@ fn select_target_test() {
 
 #[test]
 fn is_concious_test() {
+    use characterize::get_players;
+
     let players = get_players();
 
     let mut actor = players[0].clone();
@@ -672,6 +681,8 @@ fn is_concious_test() {
 
 #[test]
 fn take_damage_test() {
+    use characterize::get_players;
+
     let players = get_players();
     let mut actor = players[0].clone();
     let original_health_state = actor.hs2;
@@ -682,6 +693,8 @@ fn take_damage_test() {
 
 #[test]
 fn is_winner_test() {
+    use characterize::get_players;
+
     let players = get_players();
     let order_list = make_battle_order_list(&players, &ReportOutputLevel::Summary);
 
@@ -695,6 +708,8 @@ fn is_winner_test() {
 
 #[test]
 fn is_attack_successful() {
+    use characterize::get_players;
+
     let players = get_players();
     let successful_attack = AttackResult {
         attack_roll: 20,

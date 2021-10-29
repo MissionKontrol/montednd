@@ -1,0 +1,34 @@
+[{
+	"name": "Hero",
+	"armour_class": 12,
+	"to_hit": 20,
+	"weapon": "1d6",
+	"actions_per_round": 1,
+	"damage": 6,
+	"team": "Heros",
+	"hs2": {
+		"Alive": 10
+	}
+}, {
+	"name": "Villan-A",
+	"armour_class": 10,
+	"to_hit": 20,
+	"weapon": "1d4",
+	"actions_per_round": 1,
+	"damage": 4,
+	"team": "Villains",
+	"hs2": {
+		"Alive": 6
+	}
+}, {
+	"name": "Villan-B",
+	"armour_class": 10,
+	"to_hit": 20,
+	"weapon": "1d4",
+	"actions_per_round": 1,
+	"damage": 4,
+	"team": "Villains",
+	"hs2": {
+		"Alive": 6
+	}
+}]
