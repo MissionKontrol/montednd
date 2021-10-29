@@ -5,3 +5,4 @@ out.csv
 /output
 *.svg
 *.old
+perf.data.old

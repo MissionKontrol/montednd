@@ -1,17 +1,17 @@
 use rand::Rng;
 
 pub fn throw_roll(roll_request_list: &RollRequest) -> u16 {
-    let mut roll_result= Vec::new();
+    let mut roll_result= 0_u16;
     let mut mod_result = 0_u16;
 
     for token in &roll_request_list.request_list {
         match token {
-            RequestToken::Dice(roll) => roll_result.push(roll_dice(roll.number_of_dice, roll.number_of_die_sides)),
+            RequestToken::Dice(roll) => roll_result += roll_dice(roll.number_of_dice, roll.number_of_die_sides).total,
             RequestToken::Modifier(modifier) => mod_result += modifier.value as u16, 
             RequestToken::Error => println!("Can't Throw. Your token makes no sense!"),
-        }
+        };
     }
-    mod_result + roll_result.iter().fold(0_u16, |sum, val| sum + val.total)
+    mod_result + roll_result
 }
 
 pub fn parse_request(request_string: &str) -> Option<RollRequest> {
@@ -70,11 +70,9 @@ enum RequestToken {
 fn tokenize(mut request_string: String) -> Vec<RequestToken> {
     request_string.retain(|c| !c.is_whitespace());
     let general_token_list: Vec<&str> = request_string.rsplit('+').collect();
-    let mut request_token_list: Vec<RequestToken> = Vec::new();
+    let mut request_token_list: Vec<RequestToken> = Vec::with_capacity(general_token_list.len());
     for general_token in general_token_list {
         let request_token = make_request_token(general_token);
-
-
         request_token_list.push(request_token);
     }
     request_token_list

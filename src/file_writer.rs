@@ -15,7 +15,7 @@ impl FileWriterHandle {
     pub fn write_buffer(&self, buffer: &str) -> io::Result<()> {
         let mut f = BufWriter::new(&self.file);
         match Write::write_all(&mut f, format!("{}\n", buffer).as_bytes()) {
-            Err(error) => Err(error),
+            Err(error) => {println!("Write error! {}",error); Err(error)},
             Ok(_) => Ok(()),
         }
     }

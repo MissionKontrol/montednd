@@ -11,19 +11,17 @@ mod file_writer;
 
 const BATTLE_COLLECTION_SUMMARY_FILE: &str = "./output/bc_summary.out";
 const BATTLE_COLLECTION_ACCUMULATION_FILE: &str = "./output/bc_accumulation.out";
+const DESIRED_ITERATIONS: u32 = 10_000_000;
+const THREADS_DESIRED: u32 = 10;
+const THREAD_ITERATIONS: u32 = DESIRED_ITERATIONS/THREADS_DESIRED;
+const WRITE_TO_FILE_TRIGGER: u32 = THREAD_ITERATIONS / 20;
 
 fn main() -> Result<(),String> {
     let player_vec = get_players();
-
-    const DESIRED_ITERATIONS: u32 = 10_000_000;
-    const THREADS_DESIRED: u8 = 10;
-    let thread_iterations = DESIRED_ITERATIONS/u32::from(THREADS_DESIRED);
-
-    let mut battle_collection_list:Vec<Result<String,SendError<SendBuffer>>> = Vec::with_capacity(6);
-    let mut thread_list: Vec<thread::JoinHandle<Result<String,SendError<SendBuffer>>>> = Vec::with_capacity(6);
+    let mut thread_list: Vec<thread::JoinHandle<()>> = Vec::with_capacity(6);
     let (sender,receiver) = channel();
 
-    thread::spawn(move || {
+    let _writer_thread = thread::Builder::new().name("Writer".to_string()).spawn(move || {
         loop {
             let rx: SendBuffer = receiver.recv().unwrap();
             match write_to_file(&rx.buffer , &rx.file_name) {
@@ -36,14 +34,19 @@ fn main() -> Result<(),String> {
     for i in 0..THREADS_DESIRED as usize{
         let local_player_vec = player_vec.clone();
         let sender = sender.clone();
-        thread_list.push(thread::spawn(move||
-            {
-                battle(&local_player_vec, thread_iterations, i as u8, ReportOutputLevel::None, sender)
-            }));   
+        let name = format!("Sender-{}",i);
+        let builder = thread::Builder::new().name(name);
+
+        let handle: thread::JoinHandle<()> = builder.spawn(move || {
+            battle(&local_player_vec, THREAD_ITERATIONS, i as u8, ReportOutputLevel::None, sender).unwrap();
+        }).unwrap();   
+        thread_list.push(handle);
     }
  
     for thread_counter in thread_list {
-        battle_collection_list.push(thread_counter.join().unwrap());
+        if let Err(error) = thread_counter.join() {
+            println!("{:?}",error)
+        };
     }
     
     Ok(())
@@ -63,7 +66,8 @@ fn write_to_file(buffer: &str, file_name: &str) -> Result<String,std::io::Error>
 }
 
 fn handle_file_error(error: Error ) -> Error {
-    panic!("{}",error);
+    println!("{}",error);
+    error
 }
 
 fn get_players() -> Vec<CharacterStruct> {
@@ -116,7 +120,7 @@ fn get_players() -> Vec<CharacterStruct> {
 }
 
 fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_level: ReportOutputLevel, sender: Sender<SendBuffer>) -> Result<String, SendError<SendBuffer>> {
-    const DUMP_INCREMENT: u32 = 500_000;
+    const DUMP_INCREMENT: u32 = WRITE_TO_FILE_TRIGGER;
     let battle_order_list = make_battle_order_list(players, &report_level);
     let mut battle_result_collection = BattleResultCollection {
         battle_order_list: battle_order_list.battle_order_list.clone(),
@@ -130,11 +134,11 @@ fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_
     let mut dump_counter = DUMP_INCREMENT;
 
     for battle_num in 0..battle_count {
-        let mut battle_result = battle_order_list.clone();
-        battle_result = battle_result.run_battle(battle_num, &report_level);
-        battle_result.battle_result.battle_id = format!("{}{:0>6}", arena_id, battle_num);        
-        battle_result.battle_result.initiative_winner = initiative_winner.team.to_string();
-        battle_result_collection.battle_result_list.push(battle_result.battle_result.clone());
+        let mut current_battle = battle_order_list.clone();
+        current_battle = current_battle.run_battle(battle_num, &report_level);
+        current_battle.battle_result.battle_id = format!("{}{:0>6}", arena_id, battle_num);        
+        current_battle.battle_result.initiative_winner = initiative_winner.team.to_string();
+        battle_result_collection.battle_result_list.push(current_battle.battle_result.clone());
 
         if battle_num > dump_counter {        
             dump_counter += DUMP_INCREMENT;
