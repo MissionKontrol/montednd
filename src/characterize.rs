@@ -3,24 +3,24 @@ use serde_json::Error;
 use std::fs;
 use std::{fmt};
 
-// fn main() {
-//     let contents: String = fs::read_to_string("./input/temp.json")
-//         .expect("Something went wrong reading the file");
+fn main() {
+    let contents: String = fs::read_to_string("./input/temp.json")
+        .expect("Something went wrong reading the file");
 
-//     let foo = &contents;
-//     let deserialized: Result<CharacterStruct,Error> = serde_json::from_str(foo);
-//     if let Err(error) = deserialized {
-//         println!("ERROR: {}", error);
-//     }
-//     else {println!("deserialized = {:?}", deserialized);} 
-// }
+    let foo = &contents;
+    let deserialized: Result<CharacterStruct,Error> = serde_json::from_str(foo);
+    if let Err(error) = deserialized {
+        println!("ERROR: {}", error);
+    }
+    else {println!("deserialized = {:?}", deserialized);} 
+}
 
-fn get_players() -> Vec<CharacterStruct> {
+pub fn get_players() -> Vec<CharacterStruct> {
     let player1 = CharacterStruct {
         name: String::from("Hero"),
         armour_class: 12,
         to_hit: 20,
-        weapon: "1d6",
+        weapon: "1d6".to_string(),
         actions_per_round: 1,
         damage: 6,  
         team: Team::Heros,
@@ -31,7 +31,7 @@ fn get_players() -> Vec<CharacterStruct> {
         name: String::from("Villan-A"),
         armour_class: 10,
         to_hit: 20,
-        weapon: "1d4",
+        weapon: "1d4".to_string(),
         actions_per_round: 1,
         damage: 4,  
         team: Team::Villains,
@@ -42,7 +42,7 @@ fn get_players() -> Vec<CharacterStruct> {
         name: String::from("Villan-B"),
         armour_class: 10,
         to_hit: 20,
-        weapon: "1d4",
+        weapon: "1d4".to_string(),
         actions_per_round: 1,
         damage: 4,  
         team: Team::Villains,
@@ -65,21 +65,20 @@ fn get_players() -> Vec<CharacterStruct> {
 }
 
 #[derive(Deserialize, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
-struct CharacterStruct {
-    name: String,
+pub struct CharacterStruct {
+    pub name: String,
     // hit_points: u8,
-    armour_class: u8,
-    to_hit: u8,
-    weapon: String,
-    actions_per_round: u8,
-    damage: u8,
-    team: Team,
-    hs2: HealthState,
+    pub armour_class: u8,
+    pub to_hit: u8,
+    pub weapon: String,
+    pub actions_per_round: u8,
+    pub damage: u8,
+    pub team: Team,
+    pub hs2: HealthState,
 }
 
-
 #[derive(Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Debug)]
-enum Team {
+pub enum Team {
     Heros,
     Villains,
 }
@@ -98,7 +97,7 @@ impl Default for Team {
 }
 
 #[derive(Deserialize, Debug, Clone, Copy, PartialOrd, Eq, Ord, PartialEq)]
-enum HealthState {
+pub enum HealthState {
     Dead,
     Ko,
     Alive(u16),
@@ -111,7 +110,7 @@ impl Default for HealthState {
 }
 
 impl HealthState {
-    fn update_health_state(self, modifier: i16) -> Self {
+    pub fn update_health_state(self, modifier: i16) -> Self {
         const KO_THRESHOLD: i16 = -10;
 
         match self {

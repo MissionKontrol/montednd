@@ -9,6 +9,7 @@ use crate::file_writer::FileWriter;
 mod dice_thrower;
 mod file_writer;
 mod characterize;
+use characterize::{HealthState, Team, CharacterStruct, get_players};
 
 const BATTLE_COLLECTION_SUMMARY_FILE: &str = "./output/bc_summary.out";
 const BATTLE_COLLECTION_ACCUMULATION_FILE: &str = "./output/bc_accumulation.out";
@@ -18,7 +19,7 @@ const THREAD_ITERATIONS: u32 = DESIRED_ITERATIONS/THREADS_DESIRED;
 const WRITE_TO_FILE_TRIGGER: u32 = THREAD_ITERATIONS / 10;
 
 fn main() -> Result<(),String> {
-    let player_vec = get_players();
+    let player_vec= get_players();
     let mut thread_list: Vec<thread::JoinHandle<()>> = Vec::with_capacity(6);
     let (sender, receiver):(Sender<SendBuffer>, std::sync::mpsc::Receiver<_>) = channel();
 
@@ -79,53 +80,57 @@ fn handle_file_error(error: Error ) -> Error {
     error
 }
 
-fn get_players() -> Vec<CharacterStruct> {
-    let player1 = CharacterStruct {
-        name: String::from("Hero"),
-        armour_class: 12,
-        to_hit: 20,
-        weapon: "1d6",
-        actions_per_round: 1,
-        damage: 6,  
-        team: Team::Heros,
-        hs2: HealthState::Alive(10),
-    };
+impl CharacterStruct {
+    fn select_target(&self, combatant_list: &[BattleOrder]) -> Option<usize> {
+        for (i, target) in combatant_list.iter().enumerate() {
+            if target.character.team != self.team &&
+                target.character.is_concious() {
+                    return Some(i)
+            }
+        }
+        None
+    }
 
-    let player2 = CharacterStruct {
-        name: String::from("Villan-A"),
-        armour_class: 10,
-        to_hit: 20,
-        weapon: "1d4",
-        actions_per_round: 1,
-        damage: 4,  
-        team: Team::Villains,
-        hs2: HealthState::Alive(6),
-    };
+    fn is_concious(&self) ->  bool {
+        match self.hs2 {
+            HealthState::Dead | HealthState::Ko => false,
+            HealthState::Alive(_) => true,
+        }
+    }
 
-    let player3 = CharacterStruct {
-        name: String::from("Villan-B"),
-        armour_class: 10,
-        to_hit: 20,
-        weapon: "1d4",
-        actions_per_round: 1,
-        damage: 4,  
-        team: Team::Villains,
-        hs2: HealthState::Alive(6),
-    };
+    fn do_some_damage(&self) -> DamageResult {
+        let roll_request = dice_thrower::parse_request(&self.weapon.to_string()).unwrap();
 
-    // let player4 = CharacterStruct {
-    //     name: String::from("Hero-B"),
-    //     armour_class: 14,
-    //     to_hit: 20,
-    //     weapon: "1d4",
-    //     actions_per_round: 1,
-    //     damage: 4,  
-    //     team: Team::Heros,
-    //     hs2: HealthState::Alive(7),
-    // };
+        DamageResult {
+            damage: dice_thrower::throw_roll(&roll_request) as u8,
+        }
+    }
 
-    let player_vec = vec!(player1,player2,player3);
-    player_vec
+    fn is_attack_successful(&self, attack_result: &AttackResult ) -> bool {
+        if attack_result.attack_roll > self.armour_class {
+            return true
+        }
+            false
+    }
+
+    fn make_attack(&self) -> AttackResult {
+        let mut rng = rand::thread_rng();
+        let roll = rng.gen_range(1..=self.to_hit);
+
+        AttackResult { 
+            attack_roll: roll,
+            _roll_string: self.weapon.clone(),
+        }
+    }
+
+    fn _defend_attack(){}
+
+    fn take_damage(mut self, damage: u16) -> Self {
+        self.hs2 = self.hs2.update_health_state(damage as i16);
+        self
+    }
+
+    fn _react_to(){}
 }
 
 fn battle( players: &[CharacterStruct], battle_count: u32, arena_id: u8, report_level: ReportOutputLevel, sender: Sender<SendBuffer>) -> Result<String, SendError<SendBuffer>> {
@@ -182,7 +187,7 @@ struct SendBuffer {
     file_name: &'static str,
 }
 
-fn make_battle_order_list(players: &[CharacterStruct], report_level: &ReportOutputLevel) -> BattleOrderList {
+fn make_battle_order_list(players: &[characterize::CharacterStruct], report_level: &ReportOutputLevel) -> BattleOrderList {
     let mut battle_order_list: Vec<BattleOrder> = Vec::with_capacity(players.len());
     let initiative_die = "1d20".to_string();
     let roll_request = dice_thrower::parse_request(&initiative_die).unwrap();
@@ -226,124 +231,6 @@ impl Default for ReportOutputLevel {
     fn default() -> Self { ReportOutputLevel::None }
 }
 
-#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
-struct CharacterStruct {
-    name: String,
-    // hit_points: u8,
-    armour_class: u8,
-    to_hit: u8,
-    weapon: String,
-    actions_per_round: u8,
-    damage: u8,
-    team: Team,
-    hs2: HealthState,
-}
-
-impl CharacterStruct {
-    fn select_target(&self, combatant_list: &[BattleOrder]) -> Option<usize> {
-        for (i, target) in combatant_list.iter().enumerate() {
-            if target.character.team != self.team &&
-                target.character.is_concious() {
-                    return Some(i)
-            }
-        }
-        None
-    }
-
-    fn is_concious(&self) ->  bool {
-        match self.hs2 {
-            HealthState::Dead | HealthState::Ko => false,
-            HealthState::Alive(_) => true,
-        }
-    }
-
-    fn do_some_damage(&self) -> DamageResult {
-        let roll_request = dice_thrower::parse_request(&self.weapon.to_string()).unwrap();
-
-        DamageResult {
-            damage: dice_thrower::throw_roll(&roll_request) as u8,
-        }
-    }
-
-    fn is_attack_successful(&self, attack_result: &AttackResult ) -> bool {
-        if attack_result.attack_roll > self.armour_class {
-            return true
-        }
-            false
-    }
-
-    fn make_attack(&self) -> AttackResult {
-        let mut rng = rand::thread_rng();
-        let roll = rng.gen_range(1..=self.to_hit);
-
-        AttackResult { 
-            attack_roll: roll,
-            _roll_string: self.weapon,
-        }
-    }
-
-    fn _defend_attack(){}
-
-    fn take_damage(mut self, damage: u16) -> Self {
-        self.hs2 = self.hs2.update_health_state(damage as i16);
-        self
-    }
-
-    fn _react_to(){}
-}
-
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Debug)]
-enum Team {
-    Heros,
-    Villains,
-}
-
-impl fmt::Display for Team {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Team::Heros => write!(f,"Heros"),
-            Team::Villains => write!(f,"Villans"),
-        }
-    }
-}
-
-impl Default for Team {
-    fn default() -> Self { Team::Heros }
-}
-
-#[derive(Debug, Clone, Copy, PartialOrd, Eq, Ord, PartialEq)]
-enum HealthState {
-    Dead,
-    Ko,
-    Alive(u16),
-}
-
-impl Default for HealthState {
-    fn default() -> Self {
-        HealthState::Dead        
-    }
-}
-
-impl HealthState {
-    fn update_health_state(self, modifier: i16) -> Self {
-        const KO_THRESHOLD: i16 = -10;
-
-        match self {
-            HealthState::Dead => HealthState::Dead,
-            HealthState::Ko => if (0 - modifier) < KO_THRESHOLD { HealthState::Dead } else { HealthState::Ko },
-            HealthState::Alive(hit_points) => self.get_new_state_maybe(hit_points as i16 - modifier),
-        }
-    }
-    
-    fn get_new_state_maybe(self, integer_state: i16) -> HealthState {
-        match integer_state {
-            x if x < 0 =>  HealthState::Dead,
-            x if x == 0 =>  HealthState::Ko,
-            _ =>  HealthState::Alive(integer_state as u16),
-        }
-    }
-}
-
 #[derive(Clone, Debug, Copy)]
 enum ActionResultType {
     _CritMiss,
@@ -361,7 +248,6 @@ enum ActionType {
     _NoAction,
     _NoTarget,
 }
-
 struct AttackResult {
     attack_roll: u8,
     _roll_string: String,
@@ -500,10 +386,8 @@ impl BattleOrderList {
             turn_number,
             ..Default::default()
         }; 
-        // let mut casuality_list = self.battle_order_list.clone();
 
         for i in 0..turn_order.len(){
-            // let actor = &turn_order[i].character;
             if turn_order[i].character.is_concious() {
                 if let Some(target) = turn_order[i].get_target(&turn_order) {
                     let a_res = turn_order[i].make_attack();
