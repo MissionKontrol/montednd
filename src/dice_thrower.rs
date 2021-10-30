@@ -1,4 +1,20 @@
 use rand::Rng;
+// use std::{collections::HashMap, hash::Hash, sync::mpsc::{Receiver, SendError, Sender, channel}};
+
+// pub fn parse_cache(rx: Receiver<&str>) {
+//     let token_cache: HashMap<String,RollRequest> = HashMap::new();
+//     loop {
+//         let request = rx.recv();
+//         if let Err(error) = request {
+//             panic!("parse_thread borked");
+//         }
+
+//         let cache_value = token_cache.get(request.unwrap());
+//         match cache_value {
+//             None => parse_request(reqeust.unwrap()),
+//         }
+//     }
+// }
 
 pub fn throw_roll(roll_request_list: &RollRequest) -> u16 {
     let mut roll_result= 0_u16;

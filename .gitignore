@@ -1,8 +1,7 @@
 /target
 perf.data
+perf.data.old
 launch.json
 out.csv
 /output
 *.svg
-*.old
-perf.data.old

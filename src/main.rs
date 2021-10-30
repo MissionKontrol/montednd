@@ -1,5 +1,6 @@
 use std::{fmt};
 use std::{io::Error, thread};
+use dice_thrower::RollRequest;
 use rand::Rng;
 use std::collections::HashMap;
 use std::sync::mpsc::{SendError, Sender, channel};
@@ -13,10 +14,10 @@ use characterize::{CharacterStruct, HealthState, Team, load_players};
 
 const BATTLE_COLLECTION_SUMMARY_FILE: &str = "./output/bc_summary.out";
 const BATTLE_COLLECTION_ACCUMULATION_FILE: &str = "./output/bc_accumulation.out";
-const DESIRED_ITERATIONS: u32 = 10_000;
+const DESIRED_ITERATIONS: u32 = 10_000_000;
 const THREADS_DESIRED: u32 = 10;
 const THREAD_ITERATIONS: u32 = DESIRED_ITERATIONS/THREADS_DESIRED;
-const WRITE_TO_FILE_TRIGGER: u32 = THREAD_ITERATIONS / 10;
+const WRITE_TO_FILE_TRIGGER: u32 = 50000;
 
 fn main() -> Result<(),String> {
     let player_vec= load_players("./input/temp.json").expect("Main");
@@ -113,11 +114,11 @@ impl CharacterStruct {
     }
 
     fn make_attack(&self) -> AttackResult {
-        let mut rng = rand::thread_rng();
-        let roll = rng.gen_range(1..=self.to_hit);
+        let roll_request = dice_thrower::parse_request(
+            &format!("d{}",&self.to_hit.to_string()));
 
         AttackResult { 
-            attack_roll: roll,
+            attack_roll: dice_thrower::throw_roll(&roll_request.unwrap()) as u8,
             _roll_string: self.weapon.clone(),
         }
     }
@@ -268,10 +269,6 @@ struct TurnResultSummary {
     _action_count: u8,
     _number_of_hits: u8,
     _damage_done: u8,
-}
-
-enum TurnResultType {
-    
 }
 
 impl Summary<TurnResultSummary> for TurnResult {
