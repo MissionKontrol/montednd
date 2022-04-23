@@ -11,13 +11,14 @@ mod dice_thrower;
 mod file_writer;
 mod characterize;
 use characterize::{CharacterStruct, HealthState, Team, load_players};
+use dice_thrower::RollRequest;
 
 const BATTLE_COLLECTION_SUMMARY_FILE: &str = "./output/bc_summary.out";
 const BATTLE_COLLECTION_ACCUMULATION_FILE: &str = "./output/bc_accumulation.out";
-const DESIRED_ITERATIONS: u32 = 1_000_000;
+const DESIRED_ITERATIONS: u32 = 10_000_000;
 const THREADS_DESIRED: u32 = 10;
 const THREAD_ITERATIONS: u32 = DESIRED_ITERATIONS/THREADS_DESIRED;
-const WRITE_TO_FILE_TRIGGER: u32 = 50000;
+const WRITE_TO_FILE_TRIGGER: u32 = 50_000;
 
 fn main() -> Result<(),String> {
     let player_vec= load_players("./input/temp.json").expect("Main");
@@ -60,6 +61,28 @@ fn main() -> Result<(),String> {
     }
     
     Ok(())
+}
+#[derive(Default)]
+struct RequestCache {
+    cache: HashMap<String,RollRequest>,
+}
+
+impl RequestCache {
+    fn get_roll_request(&mut self, request: &str) -> RollRequest {
+        let cache_result = self.cache.get(request);
+        if let Some(result) = cache_result {
+            // println!("Cached result {}", request);
+            return result.clone();
+        }
+        
+        let roll_request = dice_thrower::parse_request(request);
+        if let Some(new_request) = roll_request {
+            // println!("Throw result {}", request);
+            self.cache.insert(request.to_string(),new_request.clone());
+            new_request.clone()
+        }
+        else { panic!("Unable to parse!");}
+    }
 }
 
 fn write_to_file(buffer: &str, file_name: &str) -> Result<String,std::io::Error> {
@@ -181,7 +204,6 @@ fn write_buffer(send_buffer: SendBuffer, sender: &Sender<SendBuffer>) -> Result<
         Err(error)
     } else { Ok("grand".to_string()) } 
 }
-
 struct SendBuffer {
     buffer: String,
     file_name: &'static str,
@@ -339,8 +361,8 @@ impl BattleOrderList {
     fn run_battle(mut self, battle_num: u32, report_level: &ReportOutputLevel) -> Self {
         let mut winning_result = false;
         let mut turn_number: u8 = 1;
+        let mut request_cache: RequestCache = Default::default();
         let mut turn_result: TurnResult = Default::default();
-        // let turn_result_ref = &mut turn_result;
         self.battle_result = BattleResult {
             battle_id: battle_num.to_string(),
             initiative_winner: self.battle_order_list[0].character.name.clone(),
@@ -348,7 +370,7 @@ impl BattleOrderList {
         };
     
         while !winning_result {
-            self = self.run_battle_turn(turn_number);
+            self = self.run_battle_turn(turn_number, &mut request_cache);
             self.battle_result.turn_result.push(turn_result.clone());
 
             if self.is_there_a_winner() {
@@ -375,7 +397,7 @@ impl BattleOrderList {
         self
     }
     
-    fn run_battle_turn(mut self, turn_number: u8) -> Self {
+    fn run_battle_turn(mut self, turn_number: u8, request_cache: &mut RequestCache) -> Self {
         let mut action_result: ActionResult;
         let mut turn_order = self.battle_order_list.clone();
         let mut turn_result = TurnResult {
@@ -386,10 +408,10 @@ impl BattleOrderList {
         for i in 0..turn_order.len(){
             if turn_order[i].character.is_concious() {
                 if let Some(target) = turn_order[i].get_target(&turn_order) {
-                    let a_res = turn_order[i].make_attack();
+                    let a_res = turn_order[i].make_attack(request_cache);
 
                     if turn_order[target].is_attack_successful(&a_res) {
-                        let d_res = turn_order[i].get_damage();
+                        let d_res = turn_order[i].get_damage(request_cache);
                         turn_order[target].give_damage(d_res.damage as u16);
 
                         action_result = ActionResult {
@@ -469,8 +491,15 @@ struct BattleOrder {
 }
 
 impl BattleOrder {
-    fn make_attack(&self) -> AttackResult {
-        self.character.make_attack()
+    fn make_attack(&self, request_cache: &mut RequestCache) -> AttackResult {
+        let request = request_cache.get_roll_request(
+            &format!("d{}", self.character.to_hit));       // lexer needs a fix, till then prepend d
+            
+        
+        AttackResult {
+            attack_roll: dice_thrower::throw_roll(&request) as u8,
+            _roll_string: format!("d{}", self.character.to_hit).to_string(),
+        }
     }
 
     fn get_target(&self, target_list: &[BattleOrder]) -> Option<usize> {
@@ -481,8 +510,13 @@ impl BattleOrder {
         self.character.is_attack_successful(&attack_result)
     }
 
-    fn get_damage(&self) -> DamageResult {
-        self.character.do_some_damage()
+    fn get_damage(&self, request_cache: &mut RequestCache) -> DamageResult {
+        let request = request_cache.get_roll_request(
+            &format!("d{}", self.character.damage));       // lexer needs a fix, till then prepend d
+            
+        DamageResult {
+            damage: dice_thrower::throw_roll(&request) as u8,
+        }
     }
 
     fn give_damage(&mut self, damage: u16) -> DamageResult {
